@@ -1,35 +1,41 @@
-# SIP Sistem Absensi
+# Mobile SIP Sistem Absensi
 
+Repository ini digunakan untuk pengembangan **Aplikasi Mobile SIP Sistem Absensi** PT Selada Indonesia Produktif.
 
-Sistem Absensi PT Selada Indonesia Produktif merupakan aplikasi yang dirancang untuk membantu proses pencatatan kehadiran pegawai secara digital. Sistem ini mendukung pencatatan absensi menggunakan NFC serta menyediakan dashboard monitoring secara real-time, aplikasi mobile untuk pegawai, dan web admin untuk pengelolaan data.
+Aplikasi mobile digunakan oleh pegawai untuk melakukan proses absensi serta mengakses informasi yang berkaitan dengan kehadiran.
 
-## Repository Structure
+---
 
-```
-sip-sistem-absensi/
-│
-├── backend/         # Backend API
-├── mobile/          # Mobile Application
-├── web-admin/       # Web Application for Administrator
-├── tv-dashboard/    # Real-time Dashboard for TV Display
-├── docs/            # Project Documentation
-│
-├── README.md
-└── CONTRIBUTING.md
-```
+## Fitur Utama
+
+- Login
+- Absensi
+- Riwayat Absensi
+- Pengajuan Izin
+- Pengajuan Cuti
+- Pengajuan Sakit
+- Pengajuan WFH
+- Pengajuan Dinas
+- Pengajuan Lembur
+- Notifikasi
+- Profil Pengguna
+
+---
 
 ## Branch Strategy
 
-| Branch | Description |
-|---------|-------------|
-| `main` | Stable branch / Production |
-| `develop` | Main development branch |
-| `feature/*` | Feature development |
-| `hotfix/*` | Emergency bug fixes (if needed) |
+| Branch | Fungsi |
+|---------|--------|
+| `main` | Menyimpan versi aplikasi yang stabil. |
+| `develop` | Branch utama untuk proses pengembangan. |
+| `feature/*` | Digunakan untuk pengembangan fitur baru. |
+| `hotfix/*` | Digunakan untuk perbaikan bug yang bersifat mendesak (jika diperlukan). |
+
+---
 
 ## Development Workflow
 
-```
+```text
 feature/*
    │
    ▼
@@ -39,23 +45,27 @@ develop
 main
 ```
 
+---
+
 ## Documentation
 
-Project documentation will be stored inside the `docs/` directory, including:
+Dokumentasi proyek tersedia pada folder `docs/`, meliputi:
 
 - Git Workflow
 - Branch Strategy
 - Deployment Plan
 - Environment Configuration
-- Docker Guide
-- CI/CD Plan
+
+---
 
 ## Project Status
 
-🚧 Currently in Requirement Analysis & System Design Phase.
+🚧 Saat ini proyek masih berada pada tahap **Requirement Analysis** dan **System Design**.
 
-Development, deployment, and CI/CD configuration will be implemented in the next project phases.
+---
 
 ## Team
 
-KP/PKL PT Selada Indonesia Produktif
+Kerja Praktik (KP/PKL)
+
+PT Selada Indonesia Produktif
