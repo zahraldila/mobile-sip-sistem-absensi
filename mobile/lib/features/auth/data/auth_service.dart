@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
 import '../domain/entities/auth_user.dart';
 
@@ -37,11 +38,11 @@ class AuthService {
       };
       final requestUri = Uri.parse(_dio.options.baseUrl).resolve(path).replace(queryParameters: queryParameters);
 
-      print('DIO BASE URL = ${_dio.options.baseUrl}');
-      print('REQUEST PATH = $path');
-      print('REQUEST URI = $requestUri');
-      print('REQUEST QUERY = $queryParameters');
-      print('REQUEST HEADERS = ${_dio.options.headers}');
+      debugPrint('DIO BASE URL = ${_dio.options.baseUrl}');
+      debugPrint('REQUEST PATH = $path');
+      debugPrint('REQUEST URI = $requestUri');
+      debugPrint('REQUEST QUERY = $queryParameters');
+      debugPrint('REQUEST HEADERS = ${_dio.options.headers}');
 
       final response = await _dio.get(
         path,
@@ -49,9 +50,9 @@ class AuthService {
         options: Options(validateStatus: (status) => status != null && status < 500),
       );
 
-      print('STATUS = ${response.statusCode}');
-      print('RESPONSE URI = ${response.realUri}');
-      print('BODY = ${response.data}');
+      debugPrint('STATUS = ${response.statusCode}');
+      debugPrint('RESPONSE URI = ${response.realUri}');
+      debugPrint('BODY = ${response.data}');
 
       if (response.statusCode == 200 && response.data is List && response.data.isNotEmpty) {
         final account = (response.data as List).first as Map<String, dynamic>;
@@ -75,9 +76,9 @@ class AuthService {
         );
       }
     } on DioException catch (e) {
-      print("ERROR");
-      print(e.response?.statusCode);
-      print(e.response?.data);
+      debugPrint('ERROR');
+      debugPrint('${e.response?.statusCode}');
+      debugPrint('${e.response?.data}');
       rethrow;
     }
 

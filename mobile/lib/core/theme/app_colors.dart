@@ -11,6 +11,9 @@ class AppColors {
   static const Color background = Color(0xFFF8FAFC);
   static const Color surface = Colors.white;
   static const Color surfaceAlt = Color(0xFFF1F5F9);
+  static const Color warningSoft = Color(0x28F59E0B);
+  static const Color successSoft = Color(0x2822C55E);
+  static const Color dangerSoft = Color(0x28EF4444);
   static const Color border = Color(0xFFE2E8F0);
   static const Color textPrimary = Color(0xFF0F172A);
   static const Color textSecondary = Color(0xFF475569);
