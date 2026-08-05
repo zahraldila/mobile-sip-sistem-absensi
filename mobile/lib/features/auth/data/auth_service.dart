@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
 import '../domain/entities/auth_user.dart';
 
@@ -7,20 +8,24 @@ class AuthService {
   bool _loggedIn = false;
 
   AuthService({Dio? dio})
-      : _dio = dio ??
-            Dio(
-              BaseOptions(
-                baseUrl: SupabaseConfig.url,
-                headers: {
-                  'apikey': SupabaseConfig.anonKey,
-                  'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
-                  'Content-Type': 'application/json',
-                  'Accept': 'application/json',
-                },
-              ),
-            );
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              baseUrl: SupabaseConfig.url,
+              headers: {
+                'apikey': SupabaseConfig.anonKey,
+                'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+            ),
+          );
 
-  Future<AuthUser?> login({required String identifier, required String password}) async {
+  Future<AuthUser?> login({
+    required String identifier,
+    required String password,
+  }) async {
     final normalizedIdentifier = identifier.trim();
     final normalizedPassword = password.trim();
 
@@ -35,29 +40,37 @@ class AuthService {
         'pegawai.email': 'eq.$normalizedIdentifier',
         'password': 'eq.$normalizedPassword',
       };
-      final requestUri = Uri.parse(_dio.options.baseUrl).resolve(path).replace(queryParameters: queryParameters);
+      final requestUri = Uri.parse(
+        _dio.options.baseUrl,
+      ).resolve(path).replace(queryParameters: queryParameters);
 
-      print('DIO BASE URL = ${_dio.options.baseUrl}');
-      print('REQUEST PATH = $path');
-      print('REQUEST URI = $requestUri');
-      print('REQUEST QUERY = $queryParameters');
-      print('REQUEST HEADERS = ${_dio.options.headers}');
+      debugPrint('DIO BASE URL = ${_dio.options.baseUrl}');
+      debugPrint('REQUEST PATH = $path');
+      debugPrint('REQUEST URI = $requestUri');
+      debugPrint('REQUEST QUERY = $queryParameters');
+      debugPrint('REQUEST HEADERS = ${_dio.options.headers}');
 
       final response = await _dio.get(
         path,
         queryParameters: queryParameters,
-        options: Options(validateStatus: (status) => status != null && status < 500),
+        options: Options(
+          validateStatus: (status) => status != null && status < 500,
+        ),
       );
 
-      print('STATUS = ${response.statusCode}');
-      print('RESPONSE URI = ${response.realUri}');
-      print('BODY = ${response.data}');
+      debugPrint('STATUS = ${response.statusCode}');
+      debugPrint('RESPONSE URI = ${response.realUri}');
+      debugPrint('BODY = ${response.data}');
 
-      if (response.statusCode == 200 && response.data is List && response.data.isNotEmpty) {
+      if (response.statusCode == 200 &&
+          response.data is List &&
+          response.data.isNotEmpty) {
         final account = (response.data as List).first as Map<String, dynamic>;
         final pegawaiData = account['pegawai'];
         final Map<String, dynamic> pegawai = pegawaiData is List
-            ? (pegawaiData.isNotEmpty ? pegawaiData.first as Map<String, dynamic> : <String, dynamic>{})
+            ? (pegawaiData.isNotEmpty
+                  ? pegawaiData.first as Map<String, dynamic>
+                  : <String, dynamic>{})
             : (pegawaiData as Map<String, dynamic>? ?? <String, dynamic>{});
 
         _loggedIn = true;
@@ -75,9 +88,9 @@ class AuthService {
         );
       }
     } on DioException catch (e) {
-      print("ERROR");
-      print(e.response?.statusCode);
-      print(e.response?.data);
+      debugPrint('ERROR');
+      debugPrint(e.response?.statusCode.toString());
+      debugPrint(e.response?.data.toString());
       rethrow;
     }
 

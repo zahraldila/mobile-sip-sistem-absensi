@@ -5,78 +5,78 @@ class AppTypography {
   AppTypography._();
 
   static TextTheme textTheme = TextTheme(
-    displayLarge: GoogleFonts.plusJakartaSans(
+    displayLarge: GoogleFonts.poppins(
       fontSize: 40,
       fontWeight: FontWeight.w700,
       letterSpacing: -0.5,
       color: const Color(0xFF0F172A),
     ),
-    displayMedium: GoogleFonts.plusJakartaSans(
+    displayMedium: GoogleFonts.poppins(
       fontSize: 34,
       fontWeight: FontWeight.w700,
       color: const Color(0xFF0F172A),
     ),
-    displaySmall: GoogleFonts.plusJakartaSans(
+    displaySmall: GoogleFonts.poppins(
       fontSize: 28,
       fontWeight: FontWeight.w700,
       color: const Color(0xFF0F172A),
     ),
-    headlineLarge: GoogleFonts.plusJakartaSans(
+    headlineLarge: GoogleFonts.poppins(
       fontSize: 24,
       fontWeight: FontWeight.w700,
       color: const Color(0xFF0F172A),
     ),
-    headlineMedium: GoogleFonts.plusJakartaSans(
+    headlineMedium: GoogleFonts.poppins(
       fontSize: 20,
       fontWeight: FontWeight.w600,
       color: const Color(0xFF0F172A),
     ),
-    headlineSmall: GoogleFonts.plusJakartaSans(
+    headlineSmall: GoogleFonts.poppins(
       fontSize: 18,
       fontWeight: FontWeight.w600,
       color: const Color(0xFF0F172A),
     ),
-    titleLarge: GoogleFonts.plusJakartaSans(
+    titleLarge: GoogleFonts.poppins(
       fontSize: 16,
       fontWeight: FontWeight.w600,
       color: const Color(0xFF0F172A),
     ),
-    titleMedium: GoogleFonts.plusJakartaSans(
+    titleMedium: GoogleFonts.poppins(
       fontSize: 14,
       fontWeight: FontWeight.w600,
       color: const Color(0xFF0F172A),
     ),
-    titleSmall: GoogleFonts.plusJakartaSans(
+    titleSmall: GoogleFonts.poppins(
       fontSize: 12,
       fontWeight: FontWeight.w600,
       color: const Color(0xFF475569),
     ),
-    bodyLarge: GoogleFonts.plusJakartaSans(
+    bodyLarge: GoogleFonts.poppins(
       fontSize: 16,
       fontWeight: FontWeight.w400,
       color: const Color(0xFF0F172A),
     ),
-    bodyMedium: GoogleFonts.plusJakartaSans(
+    bodyMedium: GoogleFonts.poppins(
       fontSize: 14,
       fontWeight: FontWeight.w400,
       color: const Color(0xFF475569),
     ),
-    bodySmall: GoogleFonts.plusJakartaSans(
+    bodySmall: GoogleFonts.poppins(
       fontSize: 12,
       fontWeight: FontWeight.w400,
       color: const Color(0xFF64748B),
     ),
-    labelLarge: GoogleFonts.plusJakartaSans(
+    labelLarge: GoogleFonts.poppins(
       fontSize: 14,
       fontWeight: FontWeight.w600,
       color: const Color(0xFFFFFFFF),
     ),
-    labelMedium: GoogleFonts.plusJakartaSans(
+    labelMedium: GoogleFonts.poppins(
       fontSize: 12,
       fontWeight: FontWeight.w600,
       color: const Color(0xFF475569),
     ),
-    labelSmall: GoogleFonts.plusJakartaSans(
+    labelSmall: GoogleFonts.poppins(
       fontSize: 11,
       fontWeight: FontWeight.w600,
       color: const Color(0xFF94A3B8),
