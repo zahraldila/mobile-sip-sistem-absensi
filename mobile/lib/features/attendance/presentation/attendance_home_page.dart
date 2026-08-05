@@ -8,6 +8,7 @@ import 'package:sip_sistem_absensi_mobile/core/theme/app_radius.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_shadow.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
+import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 
 class AttendanceHomePage extends StatefulWidget {
   const AttendanceHomePage({super.key});
@@ -19,7 +20,6 @@ class AttendanceHomePage extends StatefulWidget {
 class _AttendanceHomePageState extends State<AttendanceHomePage> {
   late Timer _timer;
   late String _currentTime;
-  final String employeeName = 'Farida';
   final String attendanceStatus = 'Belum Check In';
   final String workType = 'Work From Office (WFO)';
 
@@ -53,7 +53,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: AppSpacing.md),
-            _HomeHeader(name: employeeName),
+            _HomeHeader(name: AuthState.instance.currentUser?.namaPegawai ?? 'Farida'),
             const SizedBox(height: AppSpacing.xxl),
             AttendanceStatusCard(
               currentTime: _currentTime,
