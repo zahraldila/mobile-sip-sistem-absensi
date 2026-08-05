@@ -4,6 +4,8 @@ import 'package:sip_sistem_absensi_mobile/features/auth/presentation/login_page.
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 import 'package:sip_sistem_absensi_mobile/features/attendance/presentation/attendance_detail_page.dart';
 import 'package:sip_sistem_absensi_mobile/features/attendance/presentation/attendance_home_page.dart';
+import 'package:sip_sistem_absensi_mobile/features/attendance/presentation/check_in_page.dart';
+import 'package:sip_sistem_absensi_mobile/features/attendance/presentation/check_out_page.dart';
 import 'package:sip_sistem_absensi_mobile/features/history/presentation/history_page.dart';
 import 'package:sip_sistem_absensi_mobile/features/notification/presentation/notification_page.dart';
 import 'package:sip_sistem_absensi_mobile/features/profile/presentation/profile_page.dart';
@@ -42,6 +44,8 @@ class AppRouter {
           GoRoute(path: '/profile', builder: (context, state) => const ProfilePage()),
         ],
       ),
+      GoRoute(path: '/attendance/check-in', builder: (context, state) => const CheckInPage()),
+      GoRoute(path: '/attendance/check-out', builder: (context, state) => const CheckOutPage()),
       GoRoute(path: '/attendance/detail', builder: (context, state) => const AttendanceDetailPage()),
       GoRoute(path: '/history', builder: (context, state) => const HistoryPage()),
       GoRoute(path: '/notifications', builder: (context, state) => const NotificationPage()),
@@ -49,3 +53,4 @@ class AppRouter {
     ],
   );
 }
+
