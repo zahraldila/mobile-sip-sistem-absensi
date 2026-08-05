@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:sip_sistem_absensi_mobile/app_router.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_theme.dart';
+import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AuthState.instance.initialize();
   runApp(const SipSistemAbsensiApp());
 }
 

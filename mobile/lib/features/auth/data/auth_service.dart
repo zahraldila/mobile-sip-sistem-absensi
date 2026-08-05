@@ -1,38 +1,90 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
+import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
+import '../domain/entities/auth_user.dart';
 
 class AuthService {
-  static const _loggedInKey = 'auth_logged_in';
-  static const _userEmailKey = 'auth_user_email';
-  static const _seedEmail = 'rahmaattaya@gmail.com';
-  static const _seedPassword = '06062000';
-  static const _seedNip = '06062000';
+  final Dio _dio;
+  bool _loggedIn = false;
 
-  Future<bool> login({required String identifier, required String password}) async {
-    final normalizedIdentifier = identifier.trim().toLowerCase();
+  AuthService({Dio? dio})
+      : _dio = dio ??
+            Dio(
+              BaseOptions(
+                baseUrl: SupabaseConfig.url,
+                headers: {
+                  'apikey': SupabaseConfig.anonKey,
+                  'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                },
+              ),
+            );
+
+  Future<AuthUser?> login({required String identifier, required String password}) async {
+    final normalizedIdentifier = identifier.trim();
     final normalizedPassword = password.trim();
 
-    final isValidCredentials =
-        (normalizedIdentifier == _seedEmail || normalizedIdentifier == _seedNip) &&
-        normalizedPassword == _seedPassword;
-
-    if (!isValidCredentials) {
-      return false;
+    if (normalizedIdentifier.isEmpty || normalizedPassword.isEmpty) {
+      return null;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_loggedInKey, true);
-    await prefs.setString(_userEmailKey, _seedEmail);
-    return true;
+    try {
+      final path = '/rest/v1/akun';
+      final queryParameters = {
+        'select': '*,pegawai!inner(*)',
+        'pegawai.email': 'eq.$normalizedIdentifier',
+        'password': 'eq.$normalizedPassword',
+      };
+      final requestUri = Uri.parse(_dio.options.baseUrl).resolve(path).replace(queryParameters: queryParameters);
+
+      print('DIO BASE URL = ${_dio.options.baseUrl}');
+      print('REQUEST PATH = $path');
+      print('REQUEST URI = $requestUri');
+      print('REQUEST QUERY = $queryParameters');
+      print('REQUEST HEADERS = ${_dio.options.headers}');
+
+      final response = await _dio.get(
+        path,
+        queryParameters: queryParameters,
+        options: Options(validateStatus: (status) => status != null && status < 500),
+      );
+
+      print('STATUS = ${response.statusCode}');
+      print('RESPONSE URI = ${response.realUri}');
+      print('BODY = ${response.data}');
+
+      if (response.statusCode == 200 && response.data is List && response.data.isNotEmpty) {
+        final account = (response.data as List).first as Map<String, dynamic>;
+        final pegawaiData = account['pegawai'];
+        final Map<String, dynamic> pegawai = pegawaiData is List
+            ? (pegawaiData.isNotEmpty ? pegawaiData.first as Map<String, dynamic> : <String, dynamic>{})
+            : (pegawaiData as Map<String, dynamic>? ?? <String, dynamic>{});
+
+        _loggedIn = true;
+
+        return AuthUser(
+          akunId: account['akun_id']?.toString() ?? '',
+          pegawaiId: account['pegawai_id']?.toString() ?? '',
+          username: account['username']?.toString() ?? '',
+          role: account['role']?.toString() ?? '',
+          namaPegawai: pegawai['nama_pegawai']?.toString() ?? '',
+          email: pegawai['email']?.toString() ?? '',
+          jabatan: pegawai['jabatan']?.toString() ?? '',
+          divisi: pegawai['divisi']?.toString() ?? '',
+          fotoProfile: pegawai['foto_profile']?.toString() ?? '',
+        );
+      }
+    } on DioException catch (e) {
+      print("ERROR");
+      print(e.response?.statusCode);
+      print(e.response?.data);
+      rethrow;
+    }
+
+    return null;
   }
 
   Future<bool> isLoggedIn() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_loggedInKey) ?? false;
-  }
-
-  Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_loggedInKey);
-    await prefs.remove(_userEmailKey);
+    return _loggedIn;
   }
 }
