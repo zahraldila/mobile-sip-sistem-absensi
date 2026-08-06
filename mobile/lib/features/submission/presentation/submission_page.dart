@@ -6,11 +6,13 @@ import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart
 import 'package:sip_sistem_absensi_mobile/features/submission/data/datasource/pengajuan_remote_data_source.dart';
 import 'package:sip_sistem_absensi_mobile/features/submission/data/repository/pengajuan_repository_impl.dart';
 import 'package:sip_sistem_absensi_mobile/features/submission/domain/usecases/get_pengajuans.dart';
+import 'package:sip_sistem_absensi_mobile/features/submission/presentation/submission_form_page.dart';
 import 'package:sip_sistem_absensi_mobile/features/submission/presentation/widgets/pengajuan_card.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
 import 'package:sip_sistem_absensi_mobile/shared/widgets/cards/primary_card.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
+import 'package:sip_sistem_absensi_mobile/core/widgets/custom_fab.dart';
 
 class SubmissionPage extends StatefulWidget {
   const SubmissionPage({super.key});
@@ -74,82 +76,107 @@ class _SubmissionPageState extends State<SubmissionPage> {
             _filter = 'Semua';
           });
         },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(top: 24, bottom: 96),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text('Pengajuan', style: AppTypography.textTheme.headlineLarge),
-              ),
-              const SizedBox(height: 6),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text('Ajukan izin, sakit, WFH dan lainnya dengan mudah.', style: AppTypography.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-
-              FutureBuilder<List>(
-                future: _future,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) return const LoadingWidget();
-                  if (snapshot.hasError) return core_error.ErrorState(title: 'Gagal memuat', message: snapshot.error.toString(), actionLabel: 'Coba Lagi', onAction: () { setState(() { initState(); }); });
-                  final data = snapshot.data ?? [];
-                  // ensure allSubmissions is populated on first load
-                  if (_allSubmissions.isEmpty) {
-                    _allSubmissions = data;
-                    _items = List.from(data);
-                  }
-
-                  // statistics always computed from full dataset
-                  final total = _allSubmissions.length;
-                  final totalIzin = _allSubmissions.where((e) => (e.jenis as String).toLowerCase().contains('izin')).length;
-                  final totalSakit = _allSubmissions.where((e) => (e.jenis as String).toLowerCase().contains('sakit')).length;
-
-                  return Padding(
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(top: 24, bottom: 96),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
+                    child: Text('Pengajuan', style: AppTypography.textTheme.headlineLarge),
+                  ),
+                  const SizedBox(height: 6),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('Ajukan izin, sakit, WFH dan lainnya dengan mudah.', style: AppTypography.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+
+                  FutureBuilder<List>(
+                    future: _future,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) return const LoadingWidget();
+                      if (snapshot.hasError) return core_error.ErrorState(title: 'Gagal memuat', message: snapshot.error.toString(), actionLabel: 'Coba Lagi', onAction: () { setState(() { initState(); }); });
+                      final data = snapshot.data ?? [];
+                      // ensure allSubmissions is populated on first load
+                      if (_allSubmissions.isEmpty) {
+                        _allSubmissions = data;
+                        _items = List.from(data);
+                      }
+
+                      // statistics always computed from full dataset
+                      final total = _allSubmissions.length;
+                      final totalIzin = _allSubmissions.where((e) => (e.jenis as String).toLowerCase().contains('izin')).length;
+                      final totalSakit = _allSubmissions.where((e) => (e.jenis as String).toLowerCase().contains('sakit')).length;
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Expanded(child: _StatCard(title: 'Total Izin', value: totalIzin.toString())),
-                            const SizedBox(width: 12),
-                            Expanded(child: _StatCard(title: 'Total Sakit', value: totalSakit.toString())),
-                            const SizedBox(width: 12),
-                            Expanded(child: _StatCard(title: 'Total Pengajuan', value: total.toString())),
+                            Row(
+                              children: [
+                                Expanded(child: _StatCard(title: 'Total Izin', value: totalIzin.toString())),
+                                const SizedBox(width: 12),
+                                Expanded(child: _StatCard(title: 'Total Sakit', value: totalSakit.toString())),
+                                const SizedBox(width: 12),
+                                Expanded(child: _StatCard(title: 'Total Pengajuan', value: total.toString())),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: _FilterRow(filter: _filter, onFilter: _applyFilter),
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            if (_allSubmissions.isEmpty) ...[
+                              const SizedBox(height: 36),
+                              const core_empty.EmptyState(title: 'Belum ada pengajuan.', message: ''),
+                            ] else ...[
+                              ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: _items.length,
+                                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                                itemBuilder: (context, index) {
+                                  final item = _items[index];
+                                  return PengajuanCard(jenis: item.jenis, tanggal: item.tanggal, statusPengajuan: item.status);
+                                },
+                              ),
+                            ],
                           ],
                         ),
-                        const SizedBox(height: AppSpacing.lg),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: _FilterRow(filter: _filter, onFilter: _applyFilter),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        if (_allSubmissions.isEmpty) ...[
-                          const SizedBox(height: 36),
-                          const core_empty.EmptyState(title: 'Belum ada pengajuan.', message: ''),
-                        ] else ...[
-                          ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _items.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 12),
-                            itemBuilder: (context, index) {
-                              final item = _items[index];
-                              return PengajuanCard(jenis: item.jenis, tanggal: item.tanggal, statusPengajuan: item.status);
-                            },
-                          ),
-                        ],
-                      ],
-                    ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              right: 16,
+              bottom: 20,
+              child: CustomFab(
+                icon: const Icon(Icons.add, color: Colors.white),
+                onPressed: () async {
+                  final result = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(builder: (_) => const SubmissionFormPage()),
                   );
+                  if (result == true) {
+                    final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
+                    final list = await _getPengajuans(pegawaiId);
+                    setState(() {
+                      _allSubmissions = list;
+                      _items = List.from(list);
+                      _filter = 'Semua';
+                    });
+                  }
                 },
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -301,6 +328,4 @@ class _FilterScheme {
   final Color activeFill;
   final Color activeForeground;
   final Color inactiveTextColor;
-}
-
 }
