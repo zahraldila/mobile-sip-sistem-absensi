@@ -100,4 +100,48 @@ class AuthService {
   Future<bool> isLoggedIn() async {
     return _loggedIn;
   }
+
+  Future<Map<String, dynamic>?> getPegawaiDetail(String pegawaiId) async {
+    try {
+      final path = '/rest/v1/pegawai';
+      final queryParameters = {
+        'pegawai_id': 'eq.$pegawaiId',
+        'select': '*',
+      };
+      final response = await _dio.get(
+        path,
+        queryParameters: queryParameters,
+      );
+      if (response.statusCode == 200 &&
+          response.data is List &&
+          response.data.isNotEmpty) {
+        return response.data.first as Map<String, dynamic>;
+      }
+    } catch (e) {
+      debugPrint('Error fetching pegawai detail: $e');
+    }
+    return null;
+  }
+
+  Future<bool> updatePegawai(
+    String pegawaiId,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final path = '/rest/v1/pegawai';
+      final queryParameters = {
+        'pegawai_id': 'eq.$pegawaiId',
+      };
+      final response = await _dio.patch(
+        path,
+        queryParameters: queryParameters,
+        data: data,
+      );
+      return response.statusCode == 200 || response.statusCode == 204;
+    } catch (e) {
+      debugPrint('Error updating pegawai: $e');
+      return false;
+    }
+  }
 }
+

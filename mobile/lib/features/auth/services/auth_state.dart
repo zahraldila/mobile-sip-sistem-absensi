@@ -50,4 +50,41 @@ class AuthState extends ChangeNotifier {
     await _sessionService.clearSession();
     notifyListeners();
   }
+
+  void updateCurrentUserEmail(String newEmail) {
+    if (_currentUser != null) {
+      _currentUser = AuthUser(
+        akunId: _currentUser!.akunId,
+        pegawaiId: _currentUser!.pegawaiId,
+        username: _currentUser!.username,
+        role: _currentUser!.role,
+        namaPegawai: _currentUser!.namaPegawai,
+        email: newEmail,
+        jabatan: _currentUser!.jabatan,
+        divisi: _currentUser!.divisi,
+        fotoProfile: _currentUser!.fotoProfile,
+      );
+      _sessionService.persistSession(_currentUser!);
+      notifyListeners();
+    }
+  }
+
+  void updateCurrentUserFotoProfile(String newFotoProfile) {
+    if (_currentUser != null) {
+      _currentUser = AuthUser(
+        akunId: _currentUser!.akunId,
+        pegawaiId: _currentUser!.pegawaiId,
+        username: _currentUser!.username,
+        role: _currentUser!.role,
+        namaPegawai: _currentUser!.namaPegawai,
+        email: _currentUser!.email,
+        jabatan: _currentUser!.jabatan,
+        divisi: _currentUser!.divisi,
+        fotoProfile: newFotoProfile,
+      );
+      _sessionService.persistSession(_currentUser!);
+      notifyListeners();
+    }
+  }
 }
+

@@ -5,7 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../auth/data/auth_service.dart';
+import '../../auth/services/auth_state.dart';
 import 'edit_profile_sheet.dart';
+import 'profile_image_storage.dart';
 import 'success_sheet.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -16,14 +19,98 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  String _email = 'farida.aryani@selada.id';
-  String _phone = '0812-3456-7891';
+  bool _isLoading = true;
+
+  String? _errorMessage;
+  Map<String, dynamic>? _pegawaiData;
+
+  String _email = '';
+  String _phone = '';
   XFile? _pickedImage;
   String? _savedImagePath;
+
+
 
   @override
   void initState() {
     super.initState();
+    _fetchProfileData();
+  }
+
+  Future<void> _fetchProfileData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final currentUser = AuthState.instance.currentUser;
+      if (currentUser == null) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Sesi login telah berakhir atau tidak ditemukan.';
+          });
+        }
+        return;
+      }
+
+      final detail = await AuthService().getPegawaiDetail(
+        currentUser.pegawaiId,
+      );
+      if (detail != null && mounted) {
+        setState(() {
+          _pegawaiData = detail;
+          _email = detail['email']?.toString() ?? '';
+          _phone = detail['no_handphone']?.toString() ?? '';
+          _savedImagePath = detail['foto_profile']?.toString() ?? '';
+          _isLoading = false;
+        });
+      } else if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Gagal mengambil data profil dari server.';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Koneksi bermasalah: $e';
+        });
+      }
+    }
+  }
+
+  String _mapStatus(String? status) {
+    if (status == null || status.isEmpty) return 'Tetap';
+    if (status.toLowerCase() == 'aktif') return 'Tetap';
+    return status;
+  }
+
+  ImageProvider _getProfileImage(String? fotoProfile) {
+    if (_pickedImage != null) {
+      return FileImage(File(_pickedImage!.path));
+    }
+    if (_savedImagePath != null && _savedImagePath!.isNotEmpty) {
+      if (File(_savedImagePath!).existsSync()) {
+        return FileImage(File(_savedImagePath!));
+      }
+    }
+    if (fotoProfile != null && fotoProfile.isNotEmpty) {
+      if (fotoProfile.startsWith('http://') ||
+          fotoProfile.startsWith('https://')) {
+        return NetworkImage(fotoProfile);
+      }
+      if (File(fotoProfile).existsSync()) {
+        return FileImage(File(fotoProfile));
+      }
+      final url =
+          'https://fxovkmcrdeezrotwqjhb.supabase.co/storage/v1/object/public/foto_profile/$fotoProfile';
+      return NetworkImage(url);
+    }
+    return const NetworkImage('https://i.pravatar.cc/300');
   }
 
   Future<bool> _requestGalleryPermission() async {
@@ -46,21 +133,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _pickProfileImage() async {
-    final hasPermission = await _requestGalleryPermission();
-
     if (!mounted) return;
-
-    if (!hasPermission) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Izin akses galeri dibutuhkan untuk mengubah foto profil',
-          ),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
 
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -68,24 +141,135 @@ class _ProfilePageState extends State<ProfilePage> {
     if (!mounted) return;
 
     if (pickedFile != null) {
-      if (!mounted) return;
+      final currentUser = AuthState.instance.currentUser;
+      if (currentUser != null) {
+        try {
+          final fileName =
+              '${currentUser.pegawaiId}_${DateTime.now().millisecondsSinceEpoch}_profile.jpg';
+          final savedPath = await ProfileImageStorage()
+              .copyProfileImageToAppStorage(File(pickedFile.path), fileName);
 
-      setState(() {
-        _pickedImage = pickedFile;
-        _savedImagePath = pickedFile.path;
-      });
+          setState(() {
+            _pickedImage = pickedFile;
+            _savedImagePath = savedPath;
+            if (_pegawaiData != null) {
+              _pegawaiData!['foto_profile'] = savedPath;
+            }
+          });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Foto profil berhasil diperbarui'),
-          backgroundColor: Colors.green,
-        ),
-      );
+          await AuthService().updatePegawai(currentUser.pegawaiId, {
+            'foto_profile': savedPath,
+          });
+
+          AuthState.instance.updateCurrentUserFotoProfile(savedPath);
+
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Foto profil berhasil diperbarui'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Gagal menyimpan foto profil: $e'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = AuthState.instance.currentUser;
+
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF7F9FC),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1D35AB)),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Memuat data profil...',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_errorMessage != null || currentUser == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF7F9FC),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  color: Colors.redAccent,
+                  size: 60,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _errorMessage ?? 'Pengguna belum masuk.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: _fetchProfileData,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Coba Lagi'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final namaPegawai =
+        _pegawaiData?['nama_pegawai']?.toString() ?? currentUser.namaPegawai;
+    final jabatan = _pegawaiData?['jabatan']?.toString() ?? currentUser.jabatan;
+    final divisi = _pegawaiData?['divisi']?.toString() ?? currentUser.divisi;
+    final headerDivisi = divisi.isNotEmpty ? 'Divisi $divisi' : 'Divisi -';
+    final detailDivisi = divisi.isNotEmpty ? '$divisi Division' : '-';
+    final nip = _pegawaiData?['nip']?.toString() ?? 'EMP-001';
+    final statusKaryawan = _mapStatus(_pegawaiData?['status']?.toString());
+    final fotoProfile = _pegawaiData?['foto_profile']?.toString();
+
     return Scaffold(
       backgroundColor: const Color(
         0xFFF7F9FC,
@@ -127,48 +311,54 @@ class _ProfilePageState extends State<ProfilePage> {
                     // Avatar dengan Tombol Edit Pensil (Clickable)
                     Stack(
                       children: [
-                        CircleAvatar(
-                          radius: 36,
-                          backgroundImage: _pickedImage != null
-                              ? FileImage(File(_pickedImage!.path))
-                              : (_savedImagePath != null &&
-                                    File(_savedImagePath!).existsSync())
-                              ? FileImage(File(_savedImagePath!))
-                              : const NetworkImage('https://i.pravatar.cc/300')
-                                    as ImageProvider,
-                        ),
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          child: Material(
-                            color: Colors.transparent,
-                            shape: const CircleBorder(),
-                            clipBehavior: Clip.hardEdge,
-                            child: InkWell(
-                              onTap: () async {
-                                await _pickProfileImage();
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: const Color(
-                                    0xFF1D35AB,
-                                  ), // Warna biru sesuai gambar
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.edit,
-                                  size: 12,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+Material(
+  color: Colors.transparent,
+  shape: const CircleBorder(),
+  clipBehavior: Clip.antiAlias,
+  child: Ink.image(
+    image: _getProfileImage(fotoProfile),
+    fit: BoxFit.cover,
+    width: 72,
+    height: 72,
+    child: InkWell(
+      onTap: () async {
+        await _pickProfileImage();
+      },
+    ),
+  ),
+),
+Positioned(
+  right: 0,
+  bottom: 0,
+  child: Material(
+    color: Colors.transparent,
+    shape: const CircleBorder(),
+    clipBehavior: Clip.hardEdge,
+    child: InkWell(
+      onTap: () async {
+        await _pickProfileImage();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: const Color(
+            0xFF1D35AB,
+          ), // Warna biru sesuai gambar
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white,
+            width: 2,
+          ),
+        ),
+        child: const Icon(
+          Icons.edit,
+          size: 12,
+          color: Colors.white,
+        ),
+      ),
+    ),
+  ),
+),
                       ],
                     ),
                     const SizedBox(width: 16),
@@ -177,9 +367,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Farida Aryani',
-                          style: TextStyle(
+                        Text(
+                          namaPegawai,
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: Colors.black87,
@@ -187,7 +377,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Bussines Analyst',
+                          jabatan,
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey[600],
@@ -196,7 +386,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Divisi IT',
+                          headerDivisi,
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey[500],
@@ -271,25 +461,68 @@ class _ProfilePageState extends State<ProfilePage> {
                                     ? result['phone']!
                                     : _phone;
 
+                                // Store current values for potential rollback
+                                final String previousEmail = _email;
+                                final String previousPhone = _phone;
+                                // Show immediate UI update and start background save
                                 setState(() {
                                   _email = nextEmail;
                                   _phone = nextPhone;
-                                });
+                                  if (_pegawaiData != null) {
+                                    _pegawaiData!['email'] = nextEmail;
+                                    _pegawaiData!['no_handphone'] = nextPhone;
+                                  }
 
-                                setState(() {
-                                  _email = nextEmail;
-                                  _phone = nextPhone;
+                                  // Hide any loading overlay immediately
+                                   // _isSaving flag removed
                                 });
-
-                                await showModalBottomSheet(
-                                  context: context,
-                                  backgroundColor: Colors.transparent,
-                                  builder: (context) => SuccessSheet(
-                                    title: 'Berhasil!',
-                                    message:
-                                        'Informasi kontak berhasil diperbarui.',
-                                  ),
+                                // Optimistically update auth state
+                                AuthState.instance.updateCurrentUserEmail(
+                                  nextEmail,
                                 );
+                                // Perform background save without awaiting UI
+                                Future(() async {
+                                  final success = await AuthService()
+                                      .updatePegawai(currentUser.pegawaiId, {
+                                        'email': nextEmail,
+                                        'no_handphone': nextPhone,
+                                      });
+                                  if (context.mounted) {
+                                    if (success) {
+                                      await showModalBottomSheet(
+                                        context: context,
+                                        backgroundColor: Colors.transparent,
+                                        builder: (context) => const SuccessSheet(
+                                          title: 'Berhasil!',
+                                          message:
+                                              'Informasi kontak berhasil diperbarui.',
+                                        ),
+                                      );
+                                    } else {
+                                      // Revert UI on failure
+                                      setState(() {
+                                        _email = previousEmail;
+                                        _phone = previousPhone;
+                                        if (_pegawaiData != null) {
+                                          _pegawaiData!['email'] =
+                                              previousEmail;
+                                          _pegawaiData!['no_handphone'] =
+                                              previousPhone;
+                                        }
+                                      });
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Gagal menyimpan perubahan ke database.',
+                                          ),
+                                          backgroundColor: Colors.redAccent,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                });
                               }
                             },
                             child: Container(
@@ -330,22 +563,22 @@ class _ProfilePageState extends State<ProfilePage> {
                     _buildInfoRow(
                       icon: Icons.person_outline,
                       label: 'Nama Lengkap',
-                      value: 'Farida Aryani',
+                      value: namaPegawai,
                     ),
                     _buildInfoRow(
                       icon: Icons.badge_outlined,
                       label: 'NIP',
-                      value: 'EMP-001',
+                      value: nip,
                     ),
                     _buildInfoRow(
                       icon: Icons.business_center_outlined,
                       label: 'Divisi',
-                      value: 'IT Division',
+                      value: detailDivisi,
                     ),
                     _buildInfoRow(
                       icon: Icons.work_outline,
                       label: 'Jabatan',
-                      value: 'Bussines Analyst',
+                      value: jabatan,
                     ),
                     _buildInfoRow(
                       icon: Icons.email_outlined,
@@ -360,7 +593,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     _buildInfoRow(
                       icon: Icons.assignment_ind_outlined,
                       label: 'Status Karyawan',
-                      value: 'Tetap',
+                      value: statusKaryawan,
                       isTag: true,
                       isLast: true,
                     ),
@@ -437,8 +670,33 @@ class _ProfilePageState extends State<ProfilePage> {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    // TODO: Panggil fungsi logout di auth_service
+                  onPressed: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Log Out'),
+                        content: const Text(
+                          'Apakah Anda yakin ingin keluar dari akun ini?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('Batal'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.redAccent,
+                            ),
+                            child: const Text('Keluar'),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirm == true) {
+                      await AuthState.instance.logout();
+                    }
                   },
                   icon: const Icon(Icons.logout, color: Color(0xFFE11D48)),
                   label: const Text(
