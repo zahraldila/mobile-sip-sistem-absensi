@@ -17,12 +17,7 @@ class AuthState extends ChangeNotifier {
   bool get isLoggedIn => _currentUser != null;
   bool get isInitialized => _initialized;
 
-  String get redirectLocation {
-    if (_currentUser?.role.toLowerCase() == 'admin') {
-      return '/admin';
-    }
-    return '/attendance';
-  }
+  String get redirectLocation => '/attendance';
 
   Future<void> initialize() async {
     _currentUser = await _sessionService.restoreSession();
