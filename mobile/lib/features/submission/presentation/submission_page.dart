@@ -303,3 +303,4 @@ class _FilterScheme {
   final Color inactiveTextColor;
 }
 
+}

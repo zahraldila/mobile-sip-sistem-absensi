@@ -19,4 +19,13 @@ class AppColors {
   static const Color textSecondary = Color(0xFF475569);
   static const Color textDisabled = Color(0xFF94A3B8);
   static const Color shadow = Color(0x1A0F172A);
+
+  // Warna dari figma
+  static const Color cardBackground = Color(0xFFFEFEFE);
+  static const Color cardBorder = Color(0xAD95C1CC);
+  static const Color navActive = Color(0xFF1732AC);
+  static const Color greeting = Color(0xFF8A8A8A);
+  static const Color labelMuted = Color(0x8C000000);
+  static const Color textMuted = Color(0x80000000);
+  static const Color textBlack = Colors.black;
 }
