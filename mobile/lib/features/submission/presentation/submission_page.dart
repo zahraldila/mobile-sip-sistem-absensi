@@ -8,6 +8,7 @@ import 'package:sip_sistem_absensi_mobile/features/submission/data/repository/pe
 import 'package:sip_sistem_absensi_mobile/features/submission/domain/usecases/get_pengajuans.dart';
 import 'package:sip_sistem_absensi_mobile/features/submission/presentation/submission_form_page.dart';
 import 'package:sip_sistem_absensi_mobile/features/submission/presentation/widgets/pengajuan_card.dart';
+import 'package:sip_sistem_absensi_mobile/features/submission/presentation/widgets/pengajuan_detail_sheet.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
 import 'package:sip_sistem_absensi_mobile/shared/widgets/cards/primary_card.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
@@ -143,7 +144,12 @@ class _SubmissionPageState extends State<SubmissionPage> {
                                 separatorBuilder: (context, index) => const SizedBox(height: 12),
                                 itemBuilder: (context, index) {
                                   final item = _items[index];
-                                  return PengajuanCard(jenis: item.jenis, tanggal: item.tanggal, statusPengajuan: item.status);
+                                        return PengajuanCard(
+                                          jenis: item.jenis,
+                                          tanggal: item.tanggal,
+                                          statusPengajuan: item.status,
+                                          onTap: () => _showDetail(context, item),
+                                        );
                                 },
                               ),
                             ],
@@ -178,6 +184,18 @@ class _SubmissionPageState extends State<SubmissionPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showDetail(BuildContext context, dynamic item) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: PengajuanDetailSheet(pengajuan: item),
       ),
     );
   }

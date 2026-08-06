@@ -4,6 +4,9 @@ class Pengajuan {
   final DateTime tanggal;
   final String status;
   final String pegawaiId;
+  final String? lampiran;
+  final String? keterangan;
+  final DateTime? createdAt;
 
   const Pengajuan({
     required this.id,
@@ -11,5 +14,8 @@ class Pengajuan {
     required this.tanggal,
     required this.status,
     required this.pegawaiId,
+    this.lampiran,
+    this.keterangan,
+    this.createdAt,
   });
 }

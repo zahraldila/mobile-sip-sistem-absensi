@@ -8,11 +8,12 @@ import 'package:sip_sistem_absensi_mobile/shared/widgets/cards/primary_card.dart
 import 'package:sip_sistem_absensi_mobile/core/widgets/status_badge.dart';
 
 class PengajuanCard extends StatelessWidget {
-  const PengajuanCard({super.key, required this.jenis, required this.tanggal, required this.statusPengajuan});
+  const PengajuanCard({super.key, required this.jenis, required this.tanggal, required this.statusPengajuan, this.onTap});
 
   final String jenis;
   final DateTime tanggal;
   final String statusPengajuan;
+  final VoidCallback? onTap;
 
   IconData _iconForJenis() {
     final k = jenis.toLowerCase();
@@ -33,12 +34,17 @@ class PengajuanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final formatted = DateFormat('d MMMM yyyy', 'id_ID').format(tanggal);
     final style = _statusStyle;
-    return PrimaryCard(
-      color: AppColors.surface,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: PrimaryCard(
+          color: AppColors.surface,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
             Container(
               height: 52,
               width: 52,
@@ -62,7 +68,9 @@ class PengajuanCard extends StatelessWidget {
               ),
             ),
             StatusBadge(label: statusPengajuan, type: style.badgeVariant),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
