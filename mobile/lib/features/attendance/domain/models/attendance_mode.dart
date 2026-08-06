@@ -4,7 +4,8 @@ enum AttendanceMode {
   wfc;
 
   static AttendanceMode fromApiValue(String? value) {
-    switch (value?.toLowerCase()) {
+    if (value == null) return AttendanceMode.wfo;
+    switch (value.toLowerCase().trim()) {
       case 'wfh':
         return AttendanceMode.wfh;
       case 'wfc':
@@ -23,6 +24,22 @@ enum AttendanceMode {
         return 'WFH';
       case AttendanceMode.wfc:
         return 'WFC';
+      default:
+        return 'WFO';
+    }
+  }
+
+  String get fullName {
+    switch (this) {
+      case AttendanceMode.wfo:
+        return 'Work From Office (WFO)';
+      case AttendanceMode.wfh:
+        return 'Work From Home (WFH)';
+      case AttendanceMode.wfc:
+        return 'Work From Client (WFC)';
+      default:
+        return 'Work From Office (WFO)';
     }
   }
 }
+
