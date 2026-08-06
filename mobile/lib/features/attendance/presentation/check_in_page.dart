@@ -85,8 +85,6 @@ class _CheckInPageState extends State<CheckInPage>
         return 1;
       case AttendanceMode.wfc:
         return 2;
-      default:
-        return 0;
     }
   }
 

@@ -11,6 +11,9 @@ import 'package:sip_sistem_absensi_mobile/features/attendance/domain/models/atte
 import 'package:sip_sistem_absensi_mobile/features/attendance/presentation/widgets/nfc_tap_dialog.dart';
 import 'package:sip_sistem_absensi_mobile/features/attendance/services/activity_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
+import 'package:sip_sistem_absensi_mobile/features/attendance_validation/domain/entities/validation_config.dart';
+import 'package:sip_sistem_absensi_mobile/features/attendance_validation/domain/entities/validation_result.dart';
+import 'package:sip_sistem_absensi_mobile/features/attendance_validation/presentation/widgets/validation_checklist_dialog.dart';
 
 class AttendanceHomePage extends StatefulWidget {
   const AttendanceHomePage({super.key});
@@ -55,7 +58,16 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
   Future<void> _onActionPressed() async {
     if (isCheckedIn) {
       if (currentMode == AttendanceMode.wfo) {
-        // Untuk WFO: saat Check Out juga tampilkan Pop Up NFC Tap
+        // Validasi lokasi & Wi-Fi kantor sebelum Check Out WFO
+        final ValidationResult? validation = await ValidationChecklistDialog.show(
+          context,
+          config: const ValidationConfig(),
+        );
+
+        if (validation == null || !validation.isValid) return;
+
+        if (!mounted) return;
+        // Jika validasi lolos, tampilkan Pop Up NFC Tap
         NfcTapDialog.show(
           context,
           isCheckOut: true,
@@ -85,7 +97,16 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       }
     } else {
       if (currentMode == AttendanceMode.wfo) {
-        // Untuk WFO: langsung tampilkan Pop Up NFC sesuai desain
+        // Validasi lokasi & Wi-Fi kantor sebelum Check In WFO
+        final ValidationResult? validation = await ValidationChecklistDialog.show(
+          context,
+          config: const ValidationConfig(),
+        );
+
+        if (validation == null || !validation.isValid) return;
+
+        if (!mounted) return;
+        // Jika validasi lolos, tampilkan Pop Up NFC Tap
         NfcTapDialog.show(
           context,
           isCheckOut: false,

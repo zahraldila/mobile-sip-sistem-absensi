@@ -24,8 +24,6 @@ enum AttendanceMode {
         return 'WFH';
       case AttendanceMode.wfc:
         return 'WFC';
-      default:
-        return 'WFO';
     }
   }
 
@@ -37,8 +35,6 @@ enum AttendanceMode {
         return 'Work From Home (WFH)';
       case AttendanceMode.wfc:
         return 'Work From Client (WFC)';
-      default:
-        return 'Work From Office (WFO)';
     }
   }
 }

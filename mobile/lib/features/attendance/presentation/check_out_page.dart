@@ -22,7 +22,6 @@ class _CheckOutPageState extends State<CheckOutPage> {
   late String _currentTime;
   late String _currentDate;
 
-  bool _isNotesAdded = false;
   final TextEditingController _notesController = TextEditingController();
   bool _isSubmitting = false;
 
@@ -207,7 +206,6 @@ class _CheckOutPageState extends State<CheckOutPage> {
                   TextField(
                     controller: _notesController,
                     maxLines: 4,
-                    onChanged: (val) => setState(() => _isNotesAdded = val.isNotEmpty),
                     style: AppTypography.textTheme.bodyMedium?.copyWith(
                       fontSize: 13,
                       color: AppColors.textPrimary,

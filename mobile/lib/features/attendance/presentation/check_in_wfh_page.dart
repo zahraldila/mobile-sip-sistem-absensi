@@ -535,7 +535,7 @@ class _StepCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (previewWidget != null) previewWidget!,
+            ?previewWidget,
             const SizedBox(height: AppSpacing.sm),
           ],
           if (onAction != null)
