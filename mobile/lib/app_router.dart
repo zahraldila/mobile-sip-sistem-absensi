@@ -1,6 +1,8 @@
 import 'package:go_router/go_router.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/presentation/login_page.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
+import 'package:sip_sistem_absensi_mobile/features/onboarding/presentation/pages/onboarding_page.dart';
+import 'package:sip_sistem_absensi_mobile/features/onboarding/presentation/pages/splash_page.dart';
 import 'package:sip_sistem_absensi_mobile/features/attendance/presentation/attendance_detail_page.dart';
 import 'package:sip_sistem_absensi_mobile/features/attendance/presentation/attendance_home_page.dart';
 import 'package:sip_sistem_absensi_mobile/features/attendance/presentation/check_in_page.dart';
@@ -13,13 +15,20 @@ import 'package:sip_sistem_absensi_mobile/shared/layout/employee_scaffold.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/splash',
     refreshListenable: AuthState.instance,
     redirect: (context, state) {
       final authState = AuthState.instance;
-      final isLoggingIn = state.uri.path == '/login';
+      final path = state.uri.path;
+      final isSplash = path == '/splash';
+      final isOnboarding = path == '/onboarding';
+      final isLoggingIn = path == '/login';
 
       if (!authState.isInitialized) {
+        return null;
+      }
+
+      if (isSplash || isOnboarding) {
         return null;
       }
 
@@ -34,6 +43,8 @@ class AppRouter {
       return null;
     },
     routes: [
+      GoRoute(path: '/splash', builder: (context, state) => const SplashPage()),
+      GoRoute(path: '/onboarding', builder: (context, state) => const OnboardingScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
       ShellRoute(
         builder: (context, state, child) => EmployeeScaffold(body: child, currentLocation: state.toString()),
@@ -52,4 +63,3 @@ class AppRouter {
     ],
   );
 }
-
