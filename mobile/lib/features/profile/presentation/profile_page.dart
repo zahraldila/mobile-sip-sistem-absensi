@@ -1,14 +1,15 @@
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../../auth/data/auth_service.dart';
+import '../../auth/domain/entities/auth_user.dart';
 import '../../auth/services/auth_state.dart';
+import '../services/profile_photo_service.dart';
 import 'edit_profile_sheet.dart';
-import 'profile_image_storage.dart';
 import 'success_sheet.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -37,6 +38,23 @@ class _ProfilePageState extends State<ProfilePage> {
     _fetchProfileData();
   }
 
+  void _loadLocalSessionData(AuthUser currentUser) {
+    setState(() {
+      _pegawaiData = {
+        'nama_pegawai': currentUser.namaPegawai,
+        'jabatan': currentUser.jabatan,
+        'divisi': currentUser.divisi,
+        'foto_profile': currentUser.fotoProfile,
+        'foto_profil': currentUser.fotoProfile,
+        'email': currentUser.email,
+        'no_handphone': _phone.isNotEmpty ? _phone : '',
+      };
+      _email = currentUser.email;
+      _savedImagePath = currentUser.fotoProfile;
+      _isLoading = false;
+    });
+  }
+
   Future<void> _fetchProfileData() async {
     debugPrint("===== FETCH PROFILE =====");
 
@@ -58,7 +76,7 @@ class _ProfilePageState extends State<ProfilePage> {
         return;
       }
 
-      final detail = await AuthService().getPegawaiDetail(
+      final detail = await ProfilePhotoService().fetchLatestProfile(
         currentUser.pegawaiId,
       );
 
@@ -66,21 +84,26 @@ class _ProfilePageState extends State<ProfilePage> {
       debugPrint("Data DB    : $detail");
 
       if (detail != null && mounted) {
+        final resolvedUrl = ProfilePhotoService().resolvePhotoUrl(detail) ?? '';
         setState(() {
           _pegawaiData = detail;
           _email = detail['email']?.toString() ?? '';
           _phone = detail['no_handphone']?.toString() ?? '';
-          _savedImagePath = detail['foto_profile']?.toString() ?? '';
+          _savedImagePath = resolvedUrl;
           _isLoading = false;
         });
+        if (resolvedUrl.isNotEmpty) {
+          await AuthState.instance.updateCurrentUserFotoProfile(resolvedUrl);
+        }
       } else if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Gagal mengambil data profil dari server.';
-        });
+        _loadLocalSessionData(currentUser);
       }
     } catch (e) {
-      if (mounted) {
+      debugPrint("Offline/Fetch error, loading local session data: $e");
+      final currentUser = AuthState.instance.currentUser;
+      if (currentUser != null && mounted) {
+        _loadLocalSessionData(currentUser);
+      } else if (mounted) {
         setState(() {
           _isLoading = false;
           _errorMessage = 'Koneksi bermasalah: $e';
@@ -100,43 +123,39 @@ class _ProfilePageState extends State<ProfilePage> {
       return FileImage(File(_pickedImage!.path));
     }
     if (_savedImagePath != null && _savedImagePath!.isNotEmpty) {
+      if (_savedImagePath!.startsWith('http://') ||
+          _savedImagePath!.startsWith('https://')) {
+        return CachedNetworkImageProvider(_savedImagePath!);
+      }
       if (File(_savedImagePath!).existsSync()) {
         return FileImage(File(_savedImagePath!));
+      }
+      if (_savedImagePath!.contains('/')) {
+        final url =
+            'https://fxovkmcrdeezrotwqjhb.supabase.co/storage/v1/object/public/$_savedImagePath';
+        return CachedNetworkImageProvider(url);
       }
     }
     if (fotoProfile != null && fotoProfile.isNotEmpty) {
       if (fotoProfile.startsWith('http://') ||
           fotoProfile.startsWith('https://')) {
-        return NetworkImage(fotoProfile);
+        return CachedNetworkImageProvider(fotoProfile);
       }
       if (File(fotoProfile).existsSync()) {
         return FileImage(File(fotoProfile));
       }
+      if (fotoProfile.contains('/')) {
+        final url =
+            'https://fxovkmcrdeezrotwqjhb.supabase.co/storage/v1/object/public/$fotoProfile';
+        return CachedNetworkImageProvider(url);
+      }
       final url =
           'https://fxovkmcrdeezrotwqjhb.supabase.co/storage/v1/object/public/foto_profile/$fotoProfile';
-      return NetworkImage(url);
+      return CachedNetworkImageProvider(url);
     }
-    return const NetworkImage('https://i.pravatar.cc/300');
+    return const CachedNetworkImageProvider('https://i.pravatar.cc/300');
   }
 
-  Future<bool> _requestGalleryPermission() async {
-    if (Platform.isAndroid) {
-      final photosStatus = await Permission.photos.request();
-      if (photosStatus.isGranted || photosStatus.isLimited) {
-        return true;
-      }
-
-      final storageStatus = await Permission.storage.request();
-      return storageStatus.isGranted || storageStatus.isLimited;
-    }
-
-    if (Platform.isIOS) {
-      final status = await Permission.photos.request();
-      return status.isGranted || status.isLimited;
-    }
-
-    return true;
-  }
 
   Future<void> _pickProfileImage() async {
     if (!mounted) return;
@@ -150,38 +169,43 @@ class _ProfilePageState extends State<ProfilePage> {
       final currentUser = AuthState.instance.currentUser;
       if (currentUser != null) {
         try {
-          final fileName =
-              '${currentUser.pegawaiId}_${DateTime.now().millisecondsSinceEpoch}_profile.jpg';
-          final savedPath = await ProfileImageStorage()
-              .copyProfileImageToAppStorage(File(pickedFile.path), fileName);
+          final uploadedUrl = await ProfilePhotoService().updateProfilePhoto(
+            pegawaiId: currentUser.pegawaiId,
+            imageFile: File(pickedFile.path),
+          );
+
+          if (!mounted) return;
 
           setState(() {
-            _pickedImage = pickedFile;
-            _savedImagePath = savedPath;
+            _pickedImage = null;
+            _savedImagePath = uploadedUrl;
             if (_pegawaiData != null) {
-              _pegawaiData!['foto_profile'] = savedPath;
+              _pegawaiData!['foto_profile'] = uploadedUrl;
+              _pegawaiData!['foto_profil'] = uploadedUrl;
             }
           });
 
-          await AuthService().updatePegawai(currentUser.pegawaiId, {
-            'foto_profile': savedPath,
-          });
-
-          await AuthState.instance.updateCurrentUserFotoProfile(savedPath);
-
-          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Foto profil berhasil diperbarui'),
               backgroundColor: Colors.green,
             ),
           );
-        } catch (e) {
+        } catch (e, stack) {
+          debugPrint('Error picking/uploading profile image: $e');
+          debugPrint(stack.toString());
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Gagal menyimpan foto profil: $e'),
-              backgroundColor: Colors.redAccent,
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Gagal mengunggah foto profil.'),
+              content: const Text('Silakan coba lagi.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
             ),
           );
         }
@@ -274,7 +298,8 @@ class _ProfilePageState extends State<ProfilePage> {
     final detailDivisi = divisi.isNotEmpty ? '$divisi Division' : '-';
     final nip = _pegawaiData?['nip']?.toString() ?? 'EMP-001';
     final statusKaryawan = _mapStatus(_pegawaiData?['status']?.toString());
-    final fotoProfile = _pegawaiData?['foto_profile']?.toString();
+    final fotoProfile = _pegawaiData?['foto_profile']?.toString() ??
+        _pegawaiData?['foto_profil']?.toString();
 
     return Scaffold(
       backgroundColor: const Color(
