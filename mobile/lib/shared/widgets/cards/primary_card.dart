@@ -6,16 +6,18 @@ import 'package:sip_sistem_absensi_mobile/core/theme/app_shadow.dart';
 class PrimaryCard extends StatelessWidget {
   const PrimaryCard({
     required this.child,
+    this.color = AppColors.surface,
     super.key,
   });
 
   final Widget child;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: color,
         borderRadius: AppRadius.large,
         boxShadow: AppShadow.card,
       ),

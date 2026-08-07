@@ -116,8 +116,8 @@ class AuthService {
       }
     } on DioException catch (e) {
       debugPrint('ERROR');
-      debugPrint(e.response?.statusCode.toString());
-      debugPrint(e.response?.data.toString());
+      debugPrint('${e.response?.statusCode}');
+      debugPrint('${e.response?.data}');
       rethrow;
     }
 
