@@ -454,53 +454,6 @@ Positioned(
                                 ),
                               );
 
-<<<<<<< Updated upstream
-                              if (result == null || !context.mounted) return;
-
-                              final nextEmail = result['email']!.trim();
-                              final nextPhone = result['phone']!.trim();
-
-                              try {
-                                final success = await AuthService().updatePegawai(
-                                  currentUser.pegawaiId,
-                                  {
-                                    'email': nextEmail,
-                                    'no_handphone': nextPhone,
-                                  },
-                                );
-
-                                if (!success) {
-                                  throw Exception('Gagal memperbarui informasi kontak.');
-                                }
-
-                                // Update session setelah database berhasil di-update
-                                AuthState.instance.updateCurrentUserEmail(nextEmail);
-
-                                // Refresh data profile dari database
-                                await _fetchProfileData();
-
-                                if (!context.mounted) return;
-
-                                await showModalBottomSheet(
-                                  context: context,
-                                  backgroundColor: Colors.transparent,
-                                  builder: (_) => const SuccessSheet(
-                                    title: 'Berhasil!',
-                                    message: 'Informasi kontak berhasil diperbarui.',
-                                  ),
-                                );
-                              } catch (e) {
-                                if (!context.mounted) return;
-
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      e.toString().replaceFirst('Exception: ', ''),
-                                    ),
-                                    backgroundColor: Colors.redAccent,
-                                  ),
-                                );
-=======
                               if (result != null && context.mounted) {
                                 final nextEmail =
                                     result['email']?.trim().isNotEmpty == true
@@ -549,7 +502,6 @@ Positioned(
                                         'Informasi kontak berhasil diperbarui.',
                                   ),
                                 );
->>>>>>> Stashed changes
                               }
                             },
                             child: Container(

@@ -166,38 +166,17 @@ class AuthService {
         'pegawai_id': 'eq.$pegawaiId',
         'select': '*',
       };
-<<<<<<< Updated upstream
-
-      debugPrint('========== UPDATE PEGAWAI ==========');
-      debugPrint('Pegawai ID : $pegawaiId');
-      debugPrint('Data       : $data');
-
-=======
       debugPrint('PATCH pegawai request path=$path');
       debugPrint('PATCH pegawai request query=$queryParameters');
       debugPrint('PATCH pegawai request payload=$data');
       final options = await _buildRequestOptions(preferRepresentation: true);
       debugPrint('PATCH pegawai request headers=${options.headers}');
->>>>>>> Stashed changes
       final response = await _dio.patch(
         path,
         queryParameters: queryParameters,
         data: data,
         options: options,
       );
-<<<<<<< Updated upstream
-
-      debugPrint('Status : ${response.statusCode}');
-      debugPrint('Body   : ${response.data}');
-
-      return response.statusCode == 200 ||
-          response.statusCode == 204;
-    } on DioException catch (e) {
-      debugPrint('ERROR UPDATE');
-      debugPrint(e.response?.statusCode.toString());
-      debugPrint(e.response?.data.toString());
-      rethrow;
-=======
       debugPrint('PATCH pegawai status=${response.statusCode}');
       debugPrint('PATCH pegawai uri=${response.realUri}');
       debugPrint('PATCH pegawai headers=${response.headers.map}');
@@ -216,11 +195,10 @@ class AuthService {
       }
 
       return response.statusCode == 204 || response.data != null;
->>>>>>> Stashed changes
     } catch (e) {
       debugPrint('ERROR UPDATE');
       debugPrint(e.toString());
-      rethrow;
+      return false;
     }
   }
 
