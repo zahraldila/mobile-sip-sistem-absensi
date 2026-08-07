@@ -129,19 +129,37 @@ class AuthService {
   ) async {
     try {
       final path = '/rest/v1/pegawai';
+
       final queryParameters = {
         'pegawai_id': 'eq.$pegawaiId',
       };
+
+      debugPrint('========== UPDATE PEGAWAI ==========');
+      debugPrint('Pegawai ID : $pegawaiId');
+      debugPrint('Data       : $data');
+
       final response = await _dio.patch(
         path,
         queryParameters: queryParameters,
         data: data,
       );
-      return response.statusCode == 200 || response.statusCode == 204;
+
+      debugPrint('Status : ${response.statusCode}');
+      debugPrint('Body   : ${response.data}');
+
+      return response.statusCode == 200 ||
+          response.statusCode == 204;
+    } on DioException catch (e) {
+      debugPrint('ERROR UPDATE');
+      debugPrint(e.response?.statusCode.toString());
+      debugPrint(e.response?.data.toString());
+      rethrow;
     } catch (e) {
-      debugPrint('Error updating pegawai: $e');
-      return false;
+      debugPrint('ERROR UPDATE');
+      debugPrint(e.toString());
+      rethrow;
     }
   }
 }
+
 

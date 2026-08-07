@@ -19,6 +19,9 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   late final TextEditingController _emailController;
   late final TextEditingController _phoneController;
 
+  String? _emailError;
+  String? _phoneError;
+
   @override
   void initState() {
     super.initState();
@@ -31,6 +34,62 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
     _emailController.dispose();
     _phoneController.dispose();
     super.dispose();
+  }
+
+  bool _validateInput() {
+    bool isValid = true;
+
+    final email = _emailController.text.trim();
+    final phone = _phoneController.text.trim();
+
+    setState(() {
+      _emailError = null;
+      _phoneError = null;
+    });
+
+    // Validasi Email
+    if (email.isEmpty) {
+      _emailError = 'Email wajib diisi';
+      isValid = false;
+    } else {
+      final emailRegex = RegExp(
+        r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$',
+      );
+
+      if (!emailRegex.hasMatch(email)) {
+        _emailError = 'Format email tidak valid';
+        isValid = false;
+      }
+    }
+
+    // Validasi Nomor HP
+    if (phone.isEmpty) {
+      _phoneError = 'Nomor handphone wajib diisi';
+      isValid = false;
+    } else {
+      final phoneRegex = RegExp(r'^[0-9]{10,15}$');
+
+      if (!phoneRegex.hasMatch(phone)) {
+        _phoneError =
+            'Nomor handphone hanya boleh angka (10-15 digit)';
+        isValid = false;
+      }
+    }
+
+    if (!isValid) {
+      setState(() {});
+    }
+
+    return isValid;
+  }
+
+  void _save() {
+    if (!_validateInput()) return;
+
+    Navigator.of(context).pop(<String, String>{
+      'email': _emailController.text.trim(),
+      'phone': _phoneController.text.trim(),
+    });
   }
 
   @override
@@ -75,42 +134,47 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
             const SizedBox(height: 8),
             Text(
               'Perbarui email dan nomor telepon Anda.',
-              style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[600]),
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                color: Colors.grey[600],
+              ),
             ),
             const SizedBox(height: 16),
+
             TextField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
               decoration: InputDecoration(
                 labelText: 'Email',
                 prefixIcon: const Icon(Icons.email_outlined),
+                errorText: _emailError,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
             ),
+
             const SizedBox(height: 12),
+
             TextField(
               controller: _phoneController,
               keyboardType: TextInputType.phone,
               decoration: InputDecoration(
                 labelText: 'No. Handphone',
                 prefixIcon: const Icon(Icons.phone_outlined),
+                errorText: _phoneError,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
             ),
+
             const SizedBox(height: 16),
+
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(<String, String>{
-                    'email': _emailController.text.trim(),
-                    'phone': _phoneController.text.trim(),
-                  });
-                },
+                onPressed: _save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2563EB),
                   foregroundColor: Colors.white,
@@ -121,7 +185,9 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                 ),
                 child: Text(
                   'Simpan',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),

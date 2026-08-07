@@ -38,6 +38,8 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _fetchProfileData() async {
+    debugPrint("===== FETCH PROFILE =====");
+
     if (!mounted) return;
     setState(() {
       _isLoading = true;
@@ -59,6 +61,10 @@ class _ProfilePageState extends State<ProfilePage> {
       final detail = await AuthService().getPegawaiDetail(
         currentUser.pegawaiId,
       );
+
+      debugPrint("Pegawai ID : ${currentUser.pegawaiId}");
+      debugPrint("Data DB    : $detail");
+
       if (detail != null && mounted) {
         setState(() {
           _pegawaiData = detail;
@@ -438,91 +444,61 @@ Positioned(
                           clipBehavior: Clip.hardEdge,
                           child: InkWell(
                             onTap: () async {
-                              final result =
-                                  await showModalBottomSheet<
-                                    Map<String, String>
-                                  >(
-                                    context: context,
-                                    isScrollControlled: true,
-                                    backgroundColor: Colors.transparent,
-                                    builder: (context) => EditProfileSheet(
-                                      currentEmail: _email,
-                                      currentPhone: _phone,
-                                    ),
-                                  );
+                              final result = await showModalBottomSheet<Map<String, String>>(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (context) => EditProfileSheet(
+                                  currentEmail: _email,
+                                  currentPhone: _phone,
+                                ),
+                              );
 
-                              if (result != null && context.mounted) {
-                                final nextEmail =
-                                    result['email']?.trim().isNotEmpty == true
-                                    ? result['email']!
-                                    : _email;
-                                final nextPhone =
-                                    result['phone']?.trim().isNotEmpty == true
-                                    ? result['phone']!
-                                    : _phone;
+                              if (result == null || !context.mounted) return;
 
-                                // Store current values for potential rollback
-                                final String previousEmail = _email;
-                                final String previousPhone = _phone;
-                                // Show immediate UI update and start background save
-                                setState(() {
-                                  _email = nextEmail;
-                                  _phone = nextPhone;
-                                  if (_pegawaiData != null) {
-                                    _pegawaiData!['email'] = nextEmail;
-                                    _pegawaiData!['no_handphone'] = nextPhone;
-                                  }
+                              final nextEmail = result['email']!.trim();
+                              final nextPhone = result['phone']!.trim();
 
-                                  // Hide any loading overlay immediately
-                                   // _isSaving flag removed
-                                });
-                                // Optimistically update auth state
-                                AuthState.instance.updateCurrentUserEmail(
-                                  nextEmail,
+                              try {
+                                final success = await AuthService().updatePegawai(
+                                  currentUser.pegawaiId,
+                                  {
+                                    'email': nextEmail,
+                                    'no_handphone': nextPhone,
+                                  },
                                 );
-                                // Perform background save without awaiting UI
-                                Future(() async {
-                                  final success = await AuthService()
-                                      .updatePegawai(currentUser.pegawaiId, {
-                                        'email': nextEmail,
-                                        'no_handphone': nextPhone,
-                                      });
-                                  if (context.mounted) {
-                                    if (success) {
-                                      await showModalBottomSheet(
-                                        context: context,
-                                        backgroundColor: Colors.transparent,
-                                        builder: (context) => const SuccessSheet(
-                                          title: 'Berhasil!',
-                                          message:
-                                              'Informasi kontak berhasil diperbarui.',
-                                        ),
-                                      );
-                                    } else {
-                                      // Revert UI on failure
-                                      setState(() {
-                                        _email = previousEmail;
-                                        _phone = previousPhone;
-                                        if (_pegawaiData != null) {
-                                          _pegawaiData!['email'] =
-                                              previousEmail;
-                                          _pegawaiData!['no_handphone'] =
-                                              previousPhone;
-                                        }
-                                      });
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Gagal menyimpan perubahan ke database.',
-                                          ),
-                                          backgroundColor: Colors.redAccent,
-                                        ),
-                                      );
-                                    }
-                                  }
-                                });
+
+                                if (!success) {
+                                  throw Exception('Gagal memperbarui informasi kontak.');
+                                }
+
+                                // Update session setelah database berhasil di-update
+                                AuthState.instance.updateCurrentUserEmail(nextEmail);
+
+                                // Refresh data profile dari database
+                                await _fetchProfileData();
+
+                                if (!context.mounted) return;
+
+                                await showModalBottomSheet(
+                                  context: context,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (_) => const SuccessSheet(
+                                    title: 'Berhasil!',
+                                    message: 'Informasi kontak berhasil diperbarui.',
+                                  ),
+                                );
+                              } catch (e) {
+                                if (!context.mounted) return;
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      e.toString().replaceFirst('Exception: ', ''),
+                                    ),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
                               }
                             },
                             child: Container(
