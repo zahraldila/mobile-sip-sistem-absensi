@@ -5,6 +5,7 @@ import '../models/office_rule_model.dart';
 import '../models/validation_payload_model.dart';
 
 abstract class AttendanceValidationRemoteDataSource {
+  Future<List<OfficeRuleModel>> getOfficeRules();
   Future<OfficeRuleModel> getOfficeRule();
   Future<bool> submitValidationTelemetry(ValidationPayloadModel payload);
 }
@@ -28,14 +29,13 @@ class AttendanceValidationRemoteDataSourceImpl
             );
 
   @override
-  Future<OfficeRuleModel> getOfficeRule() async {
+  Future<List<OfficeRuleModel>> getOfficeRules() async {
     try {
       // 1. Query table lokasi_kantor beserta relasi wifi_kantor langsung dari Supabase
       final response = await _dio.get(
         '/rest/v1/lokasi_kantor',
         queryParameters: {
           'select': '*,wifi_kantor(*)',
-          'limit': '1',
         },
         options: Options(validateStatus: (status) => status != null && status < 500),
       );
@@ -43,58 +43,84 @@ class AttendanceValidationRemoteDataSourceImpl
       if (response.statusCode == 200 &&
           response.data is List &&
           (response.data as List).isNotEmpty) {
-        final data = (response.data as List).first as Map<String, dynamic>;
-        return OfficeRuleModel.fromJson(data);
+        final list = (response.data as List)
+            .whereType<Map<String, dynamic>>()
+            .map((e) => OfficeRuleModel.fromJson(e))
+            .toList();
+        if (list.isNotEmpty) return list;
       }
 
       // 2. Fallback jika relasi nested foreign-key belum diaktifkan di PostgREST:
       final lokasiRes = await _dio.get(
         '/rest/v1/lokasi_kantor',
-        queryParameters: {'select': '*', 'limit': '1'},
+        queryParameters: {'select': '*'},
         options: Options(validateStatus: (status) => status != null && status < 500),
       );
 
       if (lokasiRes.statusCode == 200 &&
           lokasiRes.data is List &&
           (lokasiRes.data as List).isNotEmpty) {
-        final lokasiData = (lokasiRes.data as List).first as Map<String, dynamic>;
-        final dynamic lokasiId = lokasiData['lokasi_id'];
-
         final wifiRes = await _dio.get(
           '/rest/v1/wifi_kantor',
           queryParameters: {
             'select': '*',
-            if (lokasiId != null) 'lokasi_id': 'eq.$lokasiId',
             'aktif': 'eq.true',
           },
           options: Options(validateStatus: (status) => status != null && status < 500),
         );
 
-        final wifiList = (wifiRes.statusCode == 200 && wifiRes.data is List)
+        final allWifiList = (wifiRes.statusCode == 200 && wifiRes.data is List)
             ? (wifiRes.data as List)
-            : null;
+            : <dynamic>[];
 
-        return OfficeRuleModel.fromSupabase(
-          lokasiJson: lokasiData,
-          wifiList: wifiList,
-        );
+        final List<OfficeRuleModel> resultList = [];
+        for (final rawLokasi in (lokasiRes.data as List)) {
+          if (rawLokasi is Map<String, dynamic>) {
+            final dynamic lokasiId = rawLokasi['lokasi_id'] ?? rawLokasi['id'];
+            final matchingWifis = allWifiList.where((w) {
+              if (w is Map<String, dynamic>) {
+                final wLokasiId = w['lokasi_id'];
+                return wLokasiId == null ||
+                    wLokasiId.toString() == lokasiId?.toString();
+              }
+              return false;
+            }).toList();
+
+            resultList.add(OfficeRuleModel.fromSupabase(
+              lokasiJson: rawLokasi,
+              wifiList: matchingWifis.isNotEmpty ? matchingWifis : null,
+            ));
+          }
+        }
+
+        if (resultList.isNotEmpty) {
+          return resultList;
+        }
       }
     } catch (_) {
       // Graceful fallback to default rule if offline
     }
 
-    // Default development fallback jika database belum terisi
-    return const OfficeRuleModel(
-      id: '1',
-      officeName: 'Kantor',
-      latitude: -6.910194028769816,
-      longitude: 107.65072801284482,
-      maxRadiusMeters: 50.0,
-      allowedSsids: ['SIP-Office-WiFi', 'SELADA-WIFI'],
-      allowedBssids: [],
-      isWifiRequired: true,
-      isGpsRequired: true,
-    );
+    // Default development fallback jika database belum terisi / offline
+    return const [
+      OfficeRuleModel(
+        id: '1',
+        officeName: 'Kantor',
+        latitude: -6.910194028769816,
+        longitude: 107.65072801284482,
+        maxRadiusMeters: 100.0,
+        allowedSsids: ['SIP-Office-WiFi', 'SELADA-WIFI'],
+        allowedBssids: [],
+        isWifiRequired: true,
+        isGpsRequired: true,
+      ),
+    ];
+  }
+
+  @override
+  Future<OfficeRuleModel> getOfficeRule() async {
+    final rules = await getOfficeRules();
+    return rules.first;
   }
 
   @override

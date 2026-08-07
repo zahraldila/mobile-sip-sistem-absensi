@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../domain/entities/office_rule.dart';
 import '../../domain/entities/validation_config.dart';
 import '../../domain/entities/validation_failure.dart';
 import '../../domain/entities/validation_result.dart';
@@ -18,6 +19,13 @@ class AttendanceValidationCubit extends Cubit<AttendanceValidationState> {
     required this.permissionService,
     required this.gpsService,
   }) : super(const AttendanceValidationInitial());
+
+  /// Convenience method to run WFO validation across all offices
+  Future<ValidationResult> validasiWFO({List<OfficeRule>? officeRules}) async {
+    return await runValidation(
+      config: ValidationConfig.wfo(officeRules: officeRules),
+    );
+  }
 
   /// Runs the full validation workflow
   Future<ValidationResult> runValidation({

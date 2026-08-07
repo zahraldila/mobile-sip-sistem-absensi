@@ -60,7 +60,7 @@ class OfficeRuleModel extends OfficeRule {
       longitude: (json['longitude'] as num?)?.toDouble() ?? 107.65072801284482,
       maxRadiusMeters: (json['radius_meter'] as num?)?.toDouble() ??
           (json['max_radius_meters'] as num?)?.toDouble() ??
-          50.0,
+          100.0,
       allowedSsids: ssids.isNotEmpty ? ssids : const ['SIP-Office-WiFi'],
       allowedBssids: bssids,
       isWifiRequired: json['is_wifi_required'] as bool? ?? true,

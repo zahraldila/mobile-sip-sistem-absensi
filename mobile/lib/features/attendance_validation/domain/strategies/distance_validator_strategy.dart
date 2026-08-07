@@ -1,4 +1,5 @@
 import '../../services/distance_calculator_service.dart';
+import '../entities/office_rule.dart';
 import '../entities/validation_failure.dart';
 import '../entities/validation_step_status.dart';
 import 'attendance_validator_strategy.dart';
@@ -27,6 +28,7 @@ class DistanceValidatorStrategy implements AttendanceValidatorStrategy {
     final userLng = context.longitude;
 
     if (userLat == null || userLng == null) {
+      context.isDistanceValid = false;
       context.stepDetails[stepKey] = ValidationStepStatus.failed;
       const failure = LocationFetchErrorFailure(
         details: 'Koordinat lokasi pengguna tidak ditemukan.',
@@ -36,33 +38,64 @@ class DistanceValidatorStrategy implements AttendanceValidatorStrategy {
       return const ValidationStepResult.failed(failure);
     }
 
-    final targetLat = context.officeRule.latitude;
-    final targetLng = context.officeRule.longitude;
-    final maxRadius = context.officeRule.maxRadiusMeters;
+    final offices = context.officeRules.isNotEmpty
+        ? context.officeRules
+        : [context.officeRule];
 
-    final calculatedDistance = distanceCalculatorService.calculateDistance(
-      userLat,
-      userLng,
-      targetLat,
-      targetLng,
-    );
+    OfficeRule? matchingOffice;
+    OfficeRule? nearestOffice;
+    double? minDistance;
 
-    context.distance = calculatedDistance;
-
-    if (calculatedDistance > maxRadius) {
-      context.stepDetails[stepKey] = ValidationStepStatus.failed;
-      final failure = OutOfRadiusFailure(
-        currentDistance: double.parse(calculatedDistance.toStringAsFixed(1)),
-        maxAllowedRadius: maxRadius,
-        message:
-            'Jarak Anda (${calculatedDistance.toStringAsFixed(1)}m) berada di luar batas radius kantor (${maxRadius.toStringAsFixed(0)}m).',
-        actionHint: 'Silakan mendekat ke area kantor untuk melakukan absensi.',
+    for (final office in offices) {
+      final dist = distanceCalculatorService.calculateDistance(
+        userLat,
+        userLng,
+        office.latitude,
+        office.longitude,
       );
-      context.failure = failure;
-      return ValidationStepResult.failed(failure);
+
+      if (minDistance == null || dist < minDistance) {
+        minDistance = dist;
+        nearestOffice = office;
+      }
+
+      if (dist <= office.maxRadiusMeters) {
+        matchingOffice = office;
+        minDistance = dist;
+        break;
+      }
     }
 
-    context.stepDetails[stepKey] = ValidationStepStatus.passed;
-    return const ValidationStepResult.passed();
+    final effectiveDistance = minDistance ?? 0.0;
+    context.distance = effectiveDistance;
+
+    if (matchingOffice != null) {
+      context.isDistanceValid = true;
+      context.matchedOfficeRule = matchingOffice;
+      context.stepDetails[stepKey] = ValidationStepStatus.passed;
+      return const ValidationStepResult.passed();
+    }
+
+    context.isDistanceValid = false;
+    context.matchedOfficeRule ??= nearestOffice;
+    context.stepDetails[stepKey] = ValidationStepStatus.failed;
+
+    final maxRadius = nearestOffice?.maxRadiusMeters ?? 50.0;
+    final nearestOfficeName = nearestOffice?.officeName ?? 'kantor';
+
+    final failure = OutOfRadiusFailure(
+      currentDistance: double.parse(effectiveDistance.toStringAsFixed(1)),
+      maxAllowedRadius: maxRadius,
+      message:
+          'Jarak Anda (${effectiveDistance.toStringAsFixed(1)}m) berada di luar batas radius $nearestOfficeName (${maxRadius.toStringAsFixed(0)}m).',
+      actionHint: 'Silakan mendekat ke area kantor untuk melakukan absensi.',
+    );
+    context.failure = failure;
+
+    // In WFO (where requireWifi is also true), allow Wi-Fi validation to run (shouldHalt = false)
+    return ValidationStepResult.failed(
+      failure,
+      shouldHalt: !context.config.requireWifi,
+    );
   }
 }

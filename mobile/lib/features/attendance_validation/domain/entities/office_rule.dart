@@ -38,6 +38,24 @@ class OfficeRule extends Equatable {
     );
   }
 
+  /// Default list of offices for multi-office fallback
+  static List<OfficeRule> defaultOffices() {
+    return [
+      OfficeRule.defaultOffice(),
+      const OfficeRule(
+        id: 'OFFICE-BDG-002',
+        officeName: 'Kantor Cabang Bandung',
+        latitude: -6.910194028769816,
+        longitude: 107.65072801284482,
+        maxRadiusMeters: 50.0,
+        allowedSsids: ['SIP-Bandung-WiFi', 'SELADA-WIFI', 'SIP-Guest-Secure'],
+        allowedBssids: [],
+        isWifiRequired: true,
+        isGpsRequired: true,
+      ),
+    ];
+  }
+
   @override
   List<Object?> get props => [
         id,

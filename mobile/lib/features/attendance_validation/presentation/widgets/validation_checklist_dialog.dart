@@ -345,14 +345,14 @@ class _ValidationChecklistDialogState extends State<ValidationChecklistDialog> {
       ValidationStepStatus? status, AttendanceValidationState state) {
     if (status == ValidationStepStatus.passed) {
       if (state is AttendanceValidationSuccess && state.result.distance != null) {
-        return 'Jarak: ${state.result.distance?.toStringAsFixed(1)}m (Dalam radius 50m)';
+        return 'Jarak: ${state.result.distance?.toStringAsFixed(1)}m (Dalam radius kantor)';
       }
       return 'Dalam radius kantor';
     }
     if (status == ValidationStepStatus.failed) {
       if (state is AttendanceValidationFailureState &&
           state.result.distance != null) {
-        return 'Jarak: ${state.result.distance?.toStringAsFixed(1)}m (Maksimal 50m)';
+        return 'Jarak: ${state.result.distance?.toStringAsFixed(1)}m (Di luar radius kantor)';
       }
       return 'Di luar radius kantor';
     }

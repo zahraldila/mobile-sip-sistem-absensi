@@ -44,7 +44,23 @@ void main() {
   late AttendanceValidationRepositoryImpl repository;
   late ValidateAttendanceUseCase useCase;
 
-  final defaultOfficeRule = OfficeRule.defaultOffice();
+  final officeJakarta = const OfficeRule(
+    id: 'OFFICE-JKT-001',
+    officeName: 'Kantor Pusat Jakarta',
+    latitude: -6.208800,
+    longitude: 106.845600,
+    maxRadiusMeters: 50.0,
+    allowedSsids: ['SIP-Jakarta-WiFi', 'SELADA-WIFI'],
+  );
+
+  final officeBandung = const OfficeRule(
+    id: 'OFFICE-BDG-002',
+    officeName: 'Kantor Cabang Bandung',
+    latitude: -6.910194,
+    longitude: 107.650728,
+    maxRadiusMeters: 50.0,
+    allowedSsids: ['SIP-Bandung-WiFi', 'SELADA-WIFI'],
+  );
 
   setUp(() {
     mockPermissionService = MockPermissionService();
@@ -77,106 +93,146 @@ void main() {
     useCase = ValidateAttendanceUseCase(repository);
 
     // Default mock behaviors
+    when(() => mockRemoteDataSource.getOfficeRules())
+        .thenAnswer((_) async => [
+              OfficeRuleModel.fromEntity(officeJakarta),
+              OfficeRuleModel.fromEntity(officeBandung),
+            ]);
     when(() => mockRemoteDataSource.getOfficeRule())
-        .thenAnswer((_) async => OfficeRuleModel.fromEntity(defaultOfficeRule));
+        .thenAnswer((_) async => OfficeRuleModel.fromEntity(officeJakarta));
     when(() => mockRemoteDataSource.submitValidationTelemetry(any()))
         .thenAnswer((_) async => true);
   });
 
-  group('ValidateAttendanceUseCase Pipeline', () {
-    test('Lolos Validasi (All valid): returns isValid = true', () async {
+  group('ValidateAttendanceUseCase Pipeline Multi-Office (WFO OR Logic)', () {
+    test('Lolos: Berada dalam radius Kantor Jakarta dan Wi-Fi Jakarta terhubung', () async {
       // 1. Permission granted
       when(() => mockPermissionService.isLocationPermissionGranted())
           .thenAnswer((_) async => true);
 
-      // 2. GPS enabled & returns office coordinates
+      // 2. GPS enabled & returns Jakarta office coordinates (~1 meter away)
       when(() => mockGpsService.isLocationServiceEnabled())
           .thenAnswer((_) async => true);
       when(() => mockGpsService.getCurrentPosition(timeLimit: any(named: 'timeLimit')))
           .thenAnswer((_) async => DevicePosition(
-                latitude: -6.208810, // ~1 meter from office
+                latitude: -6.208810,
                 longitude: 106.845605,
                 accuracy: 5.0,
                 timestamp: DateTime.now(),
               ));
 
-      // 3. Wi-Fi connected to allowed office SSID
+      // 3. Wi-Fi connected to Jakarta SSID
       when(() => mockWifiService.getConnectedWifiInfo())
-          .thenAnswer((_) async => WifiInfo.connected(ssid: 'SIP-Office-WiFi'));
-      when(() => mockWifiService.isSsidAllowed('SIP-Office-WiFi', any()))
+          .thenAnswer((_) async => WifiInfo.connected(ssid: 'SIP-Jakarta-WiFi'));
+      when(() => mockWifiService.isSsidAllowed('SIP-Jakarta-WiFi', any()))
           .thenAnswer((_) async => true);
 
-      final result = await useCase.execute(
-        config: ValidationConfig.wfo(officeRule: defaultOfficeRule),
+      final result = await useCase.validasiWFO(
+        officeRules: [officeJakarta, officeBandung],
       );
 
       expect(result.isValid, isTrue);
       expect(result.failure, isNull);
       expect(result.latitude, -6.208810);
-      expect(result.ssid, 'SIP-Office-WiFi');
+      expect(result.ssid, 'SIP-Jakarta-WiFi');
       expect(result.distance, isNotNull);
       expect(result.distance!, lessThan(50.0));
     });
 
-    test('Gagal: Permission ditolak', () async {
-      when(() => mockPermissionService.isLocationPermissionGranted())
-          .thenAnswer((_) async => false);
-      when(() => mockPermissionService.requestLocationPermission())
-          .thenAnswer((_) async => PermissionStatus.denied);
-
-      final result = await useCase.execute(
-        config: ValidationConfig.wfo(officeRule: defaultOfficeRule),
-      );
-
-      expect(result.isValid, isFalse);
-      expect(result.failure, isA<PermissionDeniedFailure>());
-    });
-
-    test('Gagal: GPS / Lokasi perangkat mati', () async {
-      when(() => mockPermissionService.isLocationPermissionGranted())
-          .thenAnswer((_) async => true);
-      when(() => mockGpsService.isLocationServiceEnabled())
-          .thenAnswer((_) async => false);
-
-      final result = await useCase.execute(
-        config: ValidationConfig.wfo(officeRule: defaultOfficeRule),
-      );
-
-      expect(result.isValid, isFalse);
-      expect(result.failure, isA<GpsDisabledFailure>());
-    });
-
-    test('Gagal: Berada di luar radius kantor (> 50 meter)', () async {
+    test('Lolos: Berada di Kantor Cabang Bandung (Valid ke kantor cabang mana saja)', () async {
       when(() => mockPermissionService.isLocationPermissionGranted())
           .thenAnswer((_) async => true);
       when(() => mockGpsService.isLocationServiceEnabled())
           .thenAnswer((_) async => true);
       when(() => mockGpsService.getCurrentPosition(timeLimit: any(named: 'timeLimit')))
           .thenAnswer((_) async => DevicePosition(
-                latitude: -6.215000, // ~700 meters away
-                longitude: 106.845600,
+                latitude: -6.910200, // In Bandung office
+                longitude: 107.650730,
                 accuracy: 5.0,
                 timestamp: DateTime.now(),
               ));
+      when(() => mockWifiService.getConnectedWifiInfo())
+          .thenAnswer((_) async => WifiInfo.connected(ssid: 'SIP-Bandung-WiFi'));
+      when(() => mockWifiService.isSsidAllowed('SIP-Bandung-WiFi', any()))
+          .thenAnswer((invocation) {
+            final allowed = invocation.positionalArguments[1] as List<String>;
+            return Future.value(allowed.contains('SIP-Bandung-WiFi'));
+          });
 
-      final result = await useCase.execute(
-        config: ValidationConfig.wfo(officeRule: defaultOfficeRule),
+      final result = await useCase.validasiWFO(
+        officeRules: [officeJakarta, officeBandung],
       );
 
-      expect(result.isValid, isFalse);
-      expect(result.failure, isA<OutOfRadiusFailure>());
-      expect(result.distance!, greaterThan(50.0));
+      expect(result.isValid, isTrue);
+      expect(result.failure, isNull);
+      expect(result.ssid, 'SIP-Bandung-WiFi');
+      expect(result.distance!, lessThan(50.0));
     });
 
-    test('Gagal: Wi-Fi tidak terhubung ke jaringan kantor', () async {
+    test('Lolos: Dalam radius Kantor Jakarta meskipun Wi-Fi bukan Wi-Fi kantor (OR condition)', () async {
       when(() => mockPermissionService.isLocationPermissionGranted())
           .thenAnswer((_) async => true);
       when(() => mockGpsService.isLocationServiceEnabled())
           .thenAnswer((_) async => true);
       when(() => mockGpsService.getCurrentPosition(timeLimit: any(named: 'timeLimit')))
           .thenAnswer((_) async => DevicePosition(
-                latitude: -6.208800,
-                longitude: 106.845600,
+                latitude: -6.208810, // ~1 meter from Jakarta Office
+                longitude: 106.845605,
+                accuracy: 5.0,
+                timestamp: DateTime.now(),
+              ));
+      when(() => mockWifiService.getConnectedWifiInfo())
+          .thenAnswer((_) async => WifiInfo.connected(ssid: 'Personal-Hotspot'));
+      when(() => mockWifiService.isSsidAllowed('Personal-Hotspot', any()))
+          .thenAnswer((_) async => false);
+
+      final result = await useCase.validasiWFO(
+        officeRules: [officeJakarta, officeBandung],
+      );
+
+      expect(result.isValid, isTrue);
+      expect(result.failure, isNull);
+      expect(result.distance!, lessThan(50.0));
+    });
+
+    test('Lolos: Di luar radius semua kantor tetapi terhubung ke Wi-Fi Kantor (OR condition)', () async {
+      when(() => mockPermissionService.isLocationPermissionGranted())
+          .thenAnswer((_) async => true);
+      when(() => mockGpsService.isLocationServiceEnabled())
+          .thenAnswer((_) async => true);
+      when(() => mockGpsService.getCurrentPosition(timeLimit: any(named: 'timeLimit')))
+          .thenAnswer((_) async => DevicePosition(
+                latitude: -6.220000, // Outside radius (>1km away)
+                longitude: 106.850000,
+                accuracy: 5.0,
+                timestamp: DateTime.now(),
+              ));
+      when(() => mockWifiService.getConnectedWifiInfo())
+          .thenAnswer((_) async => WifiInfo.connected(ssid: 'SIP-Jakarta-WiFi'));
+      when(() => mockWifiService.isSsidAllowed('SIP-Jakarta-WiFi', any()))
+          .thenAnswer((invocation) {
+            final allowed = invocation.positionalArguments[1] as List<String>;
+            return Future.value(allowed.contains('SIP-Jakarta-WiFi'));
+          });
+
+      final result = await useCase.validasiWFO(
+        officeRules: [officeJakarta, officeBandung],
+      );
+
+      expect(result.isValid, isTrue);
+      expect(result.failure, isNull);
+      expect(result.ssid, 'SIP-Jakarta-WiFi');
+    });
+
+    test('Gagal: Di luar radius SEMUA kantor DAN Wi-Fi bukan Wi-Fi kantor', () async {
+      when(() => mockPermissionService.isLocationPermissionGranted())
+          .thenAnswer((_) async => true);
+      when(() => mockGpsService.isLocationServiceEnabled())
+          .thenAnswer((_) async => true);
+      when(() => mockGpsService.getCurrentPosition(timeLimit: any(named: 'timeLimit')))
+          .thenAnswer((_) async => DevicePosition(
+                latitude: -6.300000, // Far away
+                longitude: 106.900000,
                 accuracy: 5.0,
                 timestamp: DateTime.now(),
               ));
@@ -185,12 +241,40 @@ void main() {
       when(() => mockWifiService.isSsidAllowed('Public-Cafe-WiFi', any()))
           .thenAnswer((_) async => false);
 
-      final result = await useCase.execute(
-        config: ValidationConfig.wfo(officeRule: defaultOfficeRule),
+      final result = await useCase.validasiWFO(
+        officeRules: [officeJakarta, officeBandung],
       );
 
       expect(result.isValid, isFalse);
-      expect(result.failure, isA<WifiNotAllowedFailure>());
+      expect(result.failure, isNotNull);
+    });
+
+    test('Gagal: Permission lokasi ditolak', () async {
+      when(() => mockPermissionService.isLocationPermissionGranted())
+          .thenAnswer((_) async => false);
+      when(() => mockPermissionService.requestLocationPermission())
+          .thenAnswer((_) async => PermissionStatus.denied);
+
+      final result = await useCase.validasiWFO(
+        officeRules: [officeJakarta, officeBandung],
+      );
+
+      expect(result.isValid, isFalse);
+      expect(result.failure, isA<PermissionDeniedFailure>());
+    });
+
+    test('Gagal: Layanan GPS dimatikan di perangkat', () async {
+      when(() => mockPermissionService.isLocationPermissionGranted())
+          .thenAnswer((_) async => true);
+      when(() => mockGpsService.isLocationServiceEnabled())
+          .thenAnswer((_) async => false);
+
+      final result = await useCase.validasiWFO(
+        officeRules: [officeJakarta, officeBandung],
+      );
+
+      expect(result.isValid, isFalse);
+      expect(result.failure, isA<GpsDisabledFailure>());
     });
   });
 }

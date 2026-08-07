@@ -5,11 +5,20 @@ import '../entities/validation_step_status.dart';
 
 class ValidationContext {
   final ValidationConfig config;
-  final OfficeRule officeRule;
+  final List<OfficeRule> officeRules;
+
+  OfficeRule get officeRule =>
+      matchedOfficeRule ??
+      (officeRules.isNotEmpty
+          ? officeRules.first
+          : OfficeRule.defaultOffice());
 
   // Mutated / accumulated during the validation pipeline
+  OfficeRule? matchedOfficeRule;
   bool isPermissionGranted;
   bool isGpsEnabled;
+  bool isDistanceValid;
+  bool isWifiValid;
   double? latitude;
   double? longitude;
   double? accuracy;
@@ -21,9 +30,13 @@ class ValidationContext {
 
   ValidationContext({
     required this.config,
-    required this.officeRule,
+    List<OfficeRule>? officeRules,
+    OfficeRule? officeRule,
+    this.matchedOfficeRule,
     this.isPermissionGranted = false,
     this.isGpsEnabled = false,
+    this.isDistanceValid = false,
+    this.isWifiValid = false,
     this.latitude,
     this.longitude,
     this.accuracy,
@@ -32,7 +45,11 @@ class ValidationContext {
     this.bssid,
     this.failure,
     Map<String, ValidationStepStatus>? stepDetails,
-  }) : stepDetails = stepDetails ?? {};
+  })  : officeRules = officeRules ??
+            (officeRule != null
+                ? [officeRule]
+                : (config.customOfficeRules ?? [OfficeRule.defaultOffice()])),
+        stepDetails = stepDetails ?? {};
 }
 
 class ValidationStepResult {

@@ -31,21 +31,36 @@ class AttendanceValidationRepositoryImpl
   });
 
   @override
+  Future<List<OfficeRule>> getOfficeRules() async {
+    return await remoteDataSource.getOfficeRules();
+  }
+
+  @override
   Future<OfficeRule> getOfficeRule() async {
     return await remoteDataSource.getOfficeRule();
+  }
+
+  @override
+  Future<ValidationResult> validasiWFO({List<OfficeRule>? officeRules}) async {
+    return await validateAttendance(
+      config: ValidationConfig.wfo(officeRules: officeRules),
+    );
   }
 
   @override
   Future<ValidationResult> validateAttendance({
     required ValidationConfig config,
   }) async {
-    // 1. Resolve Office Rules
-    final officeRule = config.customOfficeRule ?? await getOfficeRule();
+    // 1. Resolve All Office Rules
+    final officeRules = config.customOfficeRules ??
+        (config.customOfficeRule != null
+            ? [config.customOfficeRule!]
+            : await getOfficeRules());
 
-    // 2. Initialize Context
+    // 2. Initialize Context with All Offices
     final context = ValidationContext(
       config: config,
-      officeRule: officeRule,
+      officeRules: officeRules,
     );
 
     // 3. Assemble Strategy Pipeline
@@ -58,25 +73,15 @@ class AttendanceValidationRepositoryImpl
     ];
 
     final now = DateTime.now();
-    bool isOverallSuccess = true;
     ValidationFailure? finalFailure;
 
     // 4. Execute Pipeline Sequentially
     for (int i = 0; i < pipeline.length; i++) {
       final strategy = pipeline[i];
-      final stepKey = strategy.stepKey;
-
-      if (!isOverallSuccess) {
-        // Mark subsequent steps as skipped
-        context.stepDetails[stepKey] = ValidationStepStatus.skipped;
-        continue;
-      }
-
       final stepResult = await strategy.validate(context);
 
       if (!stepResult.isPassed) {
-        isOverallSuccess = false;
-        finalFailure = stepResult.failure;
+        finalFailure ??= stepResult.failure;
 
         if (stepResult.shouldHalt) {
           // Skip remaining steps
@@ -89,7 +94,31 @@ class AttendanceValidationRepositoryImpl
       }
     }
 
-    // 5. Construct Final Result
+    // 5. Evaluate Overall Success based on Attendance Mode Rules
+    bool isOverallSuccess = true;
+
+    if (config.requirePermission && !context.isPermissionGranted) {
+      isOverallSuccess = false;
+    } else if (config.requireGps &&
+        (!context.isGpsEnabled || context.latitude == null)) {
+      isOverallSuccess = false;
+    } else if (config.requireDistance && config.requireWifi) {
+      // WFO Rule: Pegawai boleh absen di kantor manapun.
+      // Valid jika cocok dengan salah satu kantor (WiFi cocok ATAU dalam radius lokasi_kantor).
+      final isOfficeMatched = context.isDistanceValid || context.isWifiValid;
+      if (!isOfficeMatched) {
+        isOverallSuccess = false;
+      } else {
+        isOverallSuccess = true;
+        finalFailure = null; // Clear non-fatal failure because OR condition is satisfied
+      }
+    } else if (config.requireDistance && !context.isDistanceValid) {
+      isOverallSuccess = false;
+    } else if (config.requireWifi && !context.isWifiValid) {
+      isOverallSuccess = false;
+    }
+
+    // 6. Construct Final Result
     final ValidationResult result;
     if (isOverallSuccess) {
       result = ValidationResult.success(
@@ -106,6 +135,7 @@ class AttendanceValidationRepositoryImpl
     } else {
       result = ValidationResult.failed(
         failure: finalFailure ??
+            context.failure ??
             const UnknownValidationFailure(error: 'Validasi tidak lolos.'),
         latitude: context.latitude,
         longitude: context.longitude,
@@ -119,7 +149,7 @@ class AttendanceValidationRepositoryImpl
       );
     }
 
-    // 6. Asynchronously submit telemetry log in background (non-blocking)
+    // 7. Asynchronously submit telemetry log in background (non-blocking)
     unawaited(submitValidationLog(result));
 
     return result;
