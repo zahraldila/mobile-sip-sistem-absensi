@@ -16,25 +16,25 @@ class OnboardingPageWidget extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 28.0),
       child: Column(
         children: [
-          const SizedBox(height: 24),
+          const SizedBox(height: 56),
           // Title
           Text(
             title,
             textAlign: TextAlign.center,
             style: GoogleFonts.poppins(
               textStyle: theme.textTheme.headlineSmall,
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           // Illustration
           Flexible(
             child: Center(
               child: Image.asset(
                 image,
                 fit: BoxFit.contain,
-                height: 390,
+                height: 330,
               ),
             ),
           ),
