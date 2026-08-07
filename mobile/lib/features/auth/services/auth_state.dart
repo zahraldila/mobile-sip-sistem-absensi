@@ -37,7 +37,10 @@ class AuthState extends ChangeNotifier {
 
     _currentUser = user;
     if (rememberMe) {
-      await _sessionService.persistSession(user);
+      await _sessionService.persistSession(
+        user,
+        accessToken: user.accessToken,
+      );
     } else {
       await _sessionService.clearSession();
     }
@@ -50,4 +53,43 @@ class AuthState extends ChangeNotifier {
     await _sessionService.clearSession();
     notifyListeners();
   }
+
+  Future<void> updateCurrentUserEmail(String newEmail) async {
+    if (_currentUser != null) {
+      _currentUser = AuthUser(
+        akunId: _currentUser!.akunId,
+        pegawaiId: _currentUser!.pegawaiId,
+        username: _currentUser!.username,
+        role: _currentUser!.role,
+        namaPegawai: _currentUser!.namaPegawai,
+        email: newEmail,
+        jabatan: _currentUser!.jabatan,
+        divisi: _currentUser!.divisi,
+        fotoProfile: _currentUser!.fotoProfile,
+        accessToken: _currentUser!.accessToken,
+      );
+      await _sessionService.persistSession(_currentUser!);
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateCurrentUserFotoProfile(String newFotoProfile) async {
+    if (_currentUser != null) {
+      _currentUser = AuthUser(
+        akunId: _currentUser!.akunId,
+        pegawaiId: _currentUser!.pegawaiId,
+        username: _currentUser!.username,
+        role: _currentUser!.role,
+        namaPegawai: _currentUser!.namaPegawai,
+        email: _currentUser!.email,
+        jabatan: _currentUser!.jabatan,
+        divisi: _currentUser!.divisi,
+        fotoProfile: newFotoProfile,
+        accessToken: _currentUser!.accessToken,
+      );
+      await _sessionService.persistSession(_currentUser!);
+      notifyListeners();
+    }
+  }
 }
+

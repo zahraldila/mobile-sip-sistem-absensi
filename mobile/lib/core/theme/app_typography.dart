@@ -67,7 +67,7 @@ class AppTypography {
       letterSpacing: 0.2,
     ),
 
-    // --- BODY  ---
+    // --- BODY ---
     bodyLarge: GoogleFonts.poppins(
       fontSize: 16,
       fontWeight: FontWeight.w400,
@@ -87,7 +87,7 @@ class AppTypography {
       height: 1.4,
     ),
 
-    // --- LABEL  ---
+    // --- LABEL ---
     labelLarge: GoogleFonts.poppins(
       fontSize: 14,
       fontWeight: FontWeight.w600,
