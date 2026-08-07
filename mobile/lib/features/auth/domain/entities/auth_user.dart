@@ -8,6 +8,7 @@ class AuthUser {
   final String jabatan;
   final String divisi;
   final String fotoProfile;
+  final String accessToken;
 
   const AuthUser({
     required this.akunId,
@@ -19,6 +20,7 @@ class AuthUser {
     required this.jabatan,
     required this.divisi,
     required this.fotoProfile,
+    this.accessToken = '',
   });
 
   factory AuthUser.fromMap(Map<String, dynamic> map) {
@@ -34,6 +36,7 @@ class AuthUser {
       jabatan: pegawai['jabatan']?.toString() ?? '',
       divisi: pegawai['divisi']?.toString() ?? '',
       fotoProfile: pegawai['foto_profile']?.toString() ?? '',
+      accessToken: map['access_token']?.toString() ?? map['token']?.toString() ?? '',
     );
   }
 
@@ -47,6 +50,7 @@ class AuthUser {
         jabatan: json['jabatan'] ?? '',
         divisi: json['divisi'] ?? '',
         fotoProfile: json['foto_profile'] ?? '',
+        accessToken: json['access_token'] ?? json['token'] ?? '',
       );
 
   Map<String, dynamic> toJson() {
@@ -60,6 +64,7 @@ class AuthUser {
       'jabatan': jabatan,
       'divisi': divisi,
       'foto_profile': fotoProfile,
+      'access_token': accessToken,
     };
   }
 }

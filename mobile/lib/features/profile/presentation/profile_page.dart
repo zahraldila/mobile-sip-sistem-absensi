@@ -167,7 +167,7 @@ class _ProfilePageState extends State<ProfilePage> {
             'foto_profile': savedPath,
           });
 
-          AuthState.instance.updateCurrentUserFotoProfile(savedPath);
+          await AuthState.instance.updateCurrentUserFotoProfile(savedPath);
 
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
@@ -454,6 +454,7 @@ Positioned(
                                 ),
                               );
 
+<<<<<<< Updated upstream
                               if (result == null || !context.mounted) return;
 
                               final nextEmail = result['email']!.trim();
@@ -499,6 +500,56 @@ Positioned(
                                     backgroundColor: Colors.redAccent,
                                   ),
                                 );
+=======
+                              if (result != null && context.mounted) {
+                                final nextEmail =
+                                    result['email']?.trim().isNotEmpty == true
+                                    ? result['email']!
+                                    : _email;
+                                final nextPhone =
+                                    result['phone']?.trim().isNotEmpty == true
+                                    ? result['phone']!
+                                    : _phone;
+                                debugPrint(
+                                  'EDIT PROFILE submit pegawaiId=${currentUser.pegawaiId}, email=$nextEmail, phone=$nextPhone',
+                                );
+                                final success = await AuthService().updatePegawai(
+                                  currentUser.pegawaiId,
+                                  {
+                                    'email': nextEmail,
+                                    'no_handphone': nextPhone,
+                                  },
+                                );
+
+                                if (!success) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Gagal menyimpan perubahan ke database.',
+                                      ),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                await AuthState.instance.updateCurrentUserEmail(
+                                  nextEmail,
+                                );
+                                await _fetchProfileData();
+
+                                if (!context.mounted) return;
+                                await showModalBottomSheet(
+                                  context: context,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (context) => const SuccessSheet(
+                                    title: 'Berhasil!',
+                                    message:
+                                        'Informasi kontak berhasil diperbarui.',
+                                  ),
+                                );
+>>>>>>> Stashed changes
                               }
                             },
                             child: Container(

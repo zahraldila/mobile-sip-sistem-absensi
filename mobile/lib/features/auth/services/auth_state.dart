@@ -37,7 +37,10 @@ class AuthState extends ChangeNotifier {
 
     _currentUser = user;
     if (rememberMe) {
-      await _sessionService.persistSession(user);
+      await _sessionService.persistSession(
+        user,
+        accessToken: user.accessToken,
+      );
     } else {
       await _sessionService.clearSession();
     }
@@ -51,7 +54,7 @@ class AuthState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateCurrentUserEmail(String newEmail) {
+  Future<void> updateCurrentUserEmail(String newEmail) async {
     if (_currentUser != null) {
       _currentUser = AuthUser(
         akunId: _currentUser!.akunId,
@@ -63,13 +66,14 @@ class AuthState extends ChangeNotifier {
         jabatan: _currentUser!.jabatan,
         divisi: _currentUser!.divisi,
         fotoProfile: _currentUser!.fotoProfile,
+        accessToken: _currentUser!.accessToken,
       );
-      _sessionService.persistSession(_currentUser!);
+      await _sessionService.persistSession(_currentUser!);
       notifyListeners();
     }
   }
 
-  void updateCurrentUserFotoProfile(String newFotoProfile) {
+  Future<void> updateCurrentUserFotoProfile(String newFotoProfile) async {
     if (_currentUser != null) {
       _currentUser = AuthUser(
         akunId: _currentUser!.akunId,
@@ -81,8 +85,9 @@ class AuthState extends ChangeNotifier {
         jabatan: _currentUser!.jabatan,
         divisi: _currentUser!.divisi,
         fotoProfile: newFotoProfile,
+        accessToken: _currentUser!.accessToken,
       );
-      _sessionService.persistSession(_currentUser!);
+      await _sessionService.persistSession(_currentUser!);
       notifyListeners();
     }
   }

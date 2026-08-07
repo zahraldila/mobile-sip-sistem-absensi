@@ -12,6 +12,7 @@ class AuthSessionService {
   static const _jabatanKey = 'auth_jabatan';
   static const _divisiKey = 'auth_divisi';
   static const _fotoProfileKey = 'auth_foto_profile';
+  static const _accessTokenKey = 'auth_access_token';
 
   Future<AuthUser?> restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
@@ -27,6 +28,7 @@ class AuthSessionService {
     final jabatan = prefs.getString(_jabatanKey);
     final divisi = prefs.getString(_divisiKey);
     final fotoProfile = prefs.getString(_fotoProfileKey);
+    final accessToken = prefs.getString(_accessTokenKey);
 
     if (username == null || role == null || akunId == null || pegawaiId == null) {
       return null;
@@ -42,10 +44,14 @@ class AuthSessionService {
       jabatan: jabatan ?? '',
       divisi: divisi ?? '',
       fotoProfile: fotoProfile ?? '',
+      accessToken: accessToken ?? '',
     );
   }
 
-  Future<void> persistSession(AuthUser user) async {
+  Future<void> persistSession(
+    AuthUser user, {
+    String? accessToken,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_loggedInKey, true);
     await prefs.setString(_usernameKey, user.username);
@@ -57,6 +63,23 @@ class AuthSessionService {
     await prefs.setString(_jabatanKey, user.jabatan);
     await prefs.setString(_divisiKey, user.divisi);
     await prefs.setString(_fotoProfileKey, user.fotoProfile);
+    final tokenToStore = accessToken ?? user.accessToken;
+    if (tokenToStore.isNotEmpty) {
+      await prefs.setString(_accessTokenKey, tokenToStore);
+    }
+  }
+
+  Future<void> persistToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (token.isNotEmpty) {
+      await prefs.setString(_accessTokenKey, token);
+    }
+  }
+
+  Future<String?> restoreToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString(_accessTokenKey);
+    return token?.isNotEmpty == true ? token : null;
   }
 
   Future<void> clearSession() async {
@@ -71,5 +94,6 @@ class AuthSessionService {
     await prefs.remove(_jabatanKey);
     await prefs.remove(_divisiKey);
     await prefs.remove(_fotoProfileKey);
+    await prefs.remove(_accessTokenKey);
   }
 }
