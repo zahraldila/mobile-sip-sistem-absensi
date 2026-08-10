@@ -136,7 +136,15 @@ class _SubmissionPageState extends State<SubmissionPage> {
                             const SizedBox(height: AppSpacing.lg),
                             if (_allSubmissions.isEmpty) ...[
                               const SizedBox(height: 36),
-                              const core_empty.EmptyState(title: 'Belum ada pengajuan.', message: ''),
+                              const core_empty.EmptyState(
+                                title: 'Belum ada pengajuan',
+                                message: 'Riwayat pengajuan izin, sakit, atau WFH Anda akan muncul di sini.',
+                                icon: Icon(
+                                  Icons.assignment_outlined,
+                                  size: 48,
+                                  color: AppColors.primary,
+                                ),
+                              ),
                             ] else ...[
                               ListView.separated(
                                 shrinkWrap: true,

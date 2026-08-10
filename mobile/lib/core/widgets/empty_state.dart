@@ -25,24 +25,31 @@ class EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: AppRadius.large,
-              boxShadow: const [
-                BoxShadow(color: AppColors.shadow, blurRadius: 16, offset: Offset(0, 10)),
-              ],
-            ),
-            child: icon ?? const Icon(Icons.inbox, size: 48, color: AppColors.textSecondary),
-          ),
+          icon ?? const Icon(Icons.inbox_outlined, size: 48, color: AppColors.textSecondary),
           const SizedBox(height: 20),
           Text(title, style: AppTypography.textTheme.headlineSmall),
           const SizedBox(height: 8),
-          Text(message, style: AppTypography.textTheme.bodyMedium, textAlign: TextAlign.center),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              message,
+              style: AppTypography.textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
           if (actionLabel != null && onAction != null) ...[
             const SizedBox(height: 20),
-            ElevatedButton(onPressed: onAction, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, shape: RoundedRectangleBorder(borderRadius: AppRadius.medium), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)), child: Text(actionLabel!, style: AppTypography.textTheme.labelLarge)),
+            ElevatedButton(
+              onPressed: onAction,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: AppRadius.medium),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              ),
+              child: Text(actionLabel!, style: AppTypography.textTheme.labelLarge),
+            ),
           ],
         ],
       ),
