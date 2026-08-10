@@ -47,7 +47,7 @@ class AppRouter {
       GoRoute(path: '/onboarding', builder: (context, state) => const OnboardingScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
       ShellRoute(
-        builder: (context, state, child) => EmployeeScaffold(body: child, currentLocation: state.toString()),
+        builder: (context, state, child) => EmployeeScaffold(body: child, currentLocation: state.uri.path),
         routes: [
           GoRoute(path: '/attendance', builder: (context, state) => const AttendanceHomePage()),
           GoRoute(path: '/submission', builder: (context, state) => const SubmissionPage()),
