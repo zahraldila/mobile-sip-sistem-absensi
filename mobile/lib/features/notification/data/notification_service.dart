@@ -31,7 +31,7 @@ class NotificationService {
         '/rest/v1/notifikasi',
         queryParameters: {
           'pegawai_id': 'eq.$pegawaiId',
-          'order': 'tanggal_kirim.desc',
+          'order': 'notifikasi_id.desc',
         },
         options: Options(
           validateStatus: (status) => status != null && status < 500,

@@ -1,4 +1,4 @@
-﻿/// Model yang merepresentasikan baris dari tabel [notifikasi] di Supabase.
+/// Model yang merepresentasikan baris dari tabel [notifikasi] di Supabase.
 class NotificationModel {
   const NotificationModel({
     required this.notifikasiId,
@@ -21,7 +21,14 @@ class NotificationModel {
       judul: json['judul']?.toString() ?? '',
       isiPesan: json['isi_pesan']?.toString() ?? '',
       tanggalKirim: json['tanggal_kirim'] != null
-          ? DateTime.tryParse(json['tanggal_kirim'].toString()) ?? DateTime.now()
+          ? (() {
+              String dateStr = json['tanggal_kirim'].toString().trim();
+              final hasTimezone = RegExp(r'(Z|[+-]\d{2}:?\d{2})$').hasMatch(dateStr);
+              if (!hasTimezone) {
+                dateStr = '${dateStr.replaceAll(' ', 'T')}Z';
+              }
+              return DateTime.tryParse(dateStr)?.toLocal() ?? DateTime.now();
+            })()
           : DateTime.now(),
     );
   }
