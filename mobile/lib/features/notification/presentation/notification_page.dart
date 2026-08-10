@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
@@ -83,6 +83,94 @@ class _NotificationPageState extends State<NotificationPage> {
     }
   }
 
+  void _showNotificationDetail(NotificationModel notification) {
+    _markAsRead(notification.notifikasiId);
+
+    showDialog(
+      context: context,
+      useRootNavigator: true,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        clipBehavior: Clip.antiAlias,
+        backgroundColor: AppColors.surface,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: const BoxDecoration(
+                      color: AppColors.success,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check,
+                      color: Colors.white,
+                      size: 36,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  notification.judul,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Text(
+                    '${_formatDate(notification.tanggalKirim)} · ${_formatTime(notification.tanggalKirim)}',
+                    style: AppTypography.textTheme.bodySmall?.copyWith(
+                      color: AppColors.textDisabled,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                const Divider(height: 32, thickness: 1, color: AppColors.border),
+                Text(
+                  notification.isiPesan,
+                  style: AppTypography.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Text(
+                    'Tutup',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Format [DateTime] menjadi "23 Juli 2026".
   String _formatDate(DateTime dt) {
     return DateFormat('d MMMM yyyy', 'id_ID').format(dt);
@@ -154,7 +242,7 @@ class _NotificationPageState extends State<NotificationPage> {
             date: _formatDate(notification.tanggalKirim),
             time: _formatTime(notification.tanggalKirim),
             isRead: isRead,
-            onTap: () => _markAsRead(notification.notifikasiId),
+            onTap: () => _showNotificationDetail(notification),
           ),
         );
       },

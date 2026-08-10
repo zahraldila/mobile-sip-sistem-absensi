@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_radius.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
@@ -36,7 +36,6 @@ class NotificationCard extends StatelessWidget {
   final VoidCallback onTap;
 
   static const Color _dotUnread = Color(0xFF2563EB); // AppColors.primary
-  static const Color _dotRead = Color(0xFF94A3B8);   // AppColors.textDisabled
 
   @override
   Widget build(BuildContext context) {
@@ -101,16 +100,17 @@ class NotificationCard extends StatelessWidget {
                           fontSize: 11,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      // Indicator dot
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: isRead ? _dotRead : _dotUnread,
-                          shape: BoxShape.circle,
+                      if (!isRead) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: _dotUnread,
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 4),
