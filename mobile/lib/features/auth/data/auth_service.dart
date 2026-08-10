@@ -60,7 +60,7 @@ class AuthService {
     try {
       final path = '/rest/v1/akun';
       final queryParameters = {
-        'select': '*,pegawai!inner(*)',
+        'select': '*,pegawai!inner(*,master_divisi(nama_divisi),master_jabatan(nama_jabatan))',
         'pegawai.email': 'eq.$normalizedIdentifier',
         'password': 'eq.$normalizedPassword',
       };
@@ -96,6 +96,20 @@ class AuthService {
                   : <String, dynamic>{})
             : (pegawaiData as Map<String, dynamic>? ?? <String, dynamic>{});
 
+        final divisiData = pegawai['master_divisi'];
+        final divisiName = divisiData is Map 
+            ? divisiData['nama_divisi']?.toString() ?? ''
+            : (divisiData is List && divisiData.isNotEmpty 
+                ? (divisiData.first as Map)['nama_divisi']?.toString() ?? ''
+                : '');
+
+        final jabatanData = pegawai['master_jabatan'];
+        final jabatanName = jabatanData is Map 
+            ? jabatanData['nama_jabatan']?.toString() ?? ''
+            : (jabatanData is List && jabatanData.isNotEmpty 
+                ? (jabatanData.first as Map)['nama_jabatan']?.toString() ?? ''
+                : '');
+
         _loggedIn = true;
 
         final accessToken = _extractAccessToken(account, response);
@@ -108,8 +122,8 @@ class AuthService {
           role: account['role']?.toString() ?? '',
           namaPegawai: pegawai['nama_pegawai']?.toString() ?? '',
           email: pegawai['email']?.toString() ?? '',
-          jabatan: pegawai['jabatan']?.toString() ?? '',
-          divisi: pegawai['divisi']?.toString() ?? '',
+          jabatan: jabatanName.isNotEmpty ? jabatanName : (pegawai['jabatan']?.toString() ?? ''),
+          divisi: divisiName.isNotEmpty ? divisiName : (pegawai['divisi']?.toString() ?? ''),
           fotoProfile: pegawai['foto_profile']?.toString() ?? '',
           accessToken: accessToken,
         );
@@ -133,7 +147,7 @@ class AuthService {
       final path = '/rest/v1/pegawai';
       final queryParameters = {
         'pegawai_id': 'eq.$pegawaiId',
-        'select': '*',
+        'select': '*,master_divisi(nama_divisi),master_jabatan(nama_jabatan)',
       };
       final options = await _buildRequestOptions();
       final response = await _dio.get(
@@ -147,7 +161,27 @@ class AuthService {
       if (response.statusCode == 200 &&
           response.data is List &&
           response.data.isNotEmpty) {
-        return response.data.first as Map<String, dynamic>;
+        final rawDetail = response.data.first as Map<String, dynamic>;
+        
+        final divisiData = rawDetail['master_divisi'];
+        final divisiName = divisiData is Map 
+            ? divisiData['nama_divisi']?.toString() ?? ''
+            : (divisiData is List && divisiData.isNotEmpty 
+                ? (divisiData.first as Map)['nama_divisi']?.toString() ?? ''
+                : '');
+
+        final jabatanData = rawDetail['master_jabatan'];
+        final jabatanName = jabatanData is Map 
+            ? jabatanData['nama_jabatan']?.toString() ?? ''
+            : (jabatanData is List && jabatanData.isNotEmpty 
+                ? (jabatanData.first as Map)['nama_jabatan']?.toString() ?? ''
+                : '');
+
+        return {
+          ...rawDetail,
+          'divisi': divisiName,
+          'jabatan': jabatanName,
+        };
       }
     } catch (e) {
       debugPrint('Error fetching pegawai detail: $e');

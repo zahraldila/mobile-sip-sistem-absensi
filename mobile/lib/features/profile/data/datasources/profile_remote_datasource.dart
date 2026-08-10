@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path/path.dart' as path;
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
-import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_session_service.dart';
+import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 
 class ProfileRemoteDataSource {
   ProfileRemoteDataSource({Dio? dio})
@@ -33,7 +33,7 @@ class ProfileRemoteDataSource {
       ...?extraHeaders,
     };
 
-    final token = await AuthSessionService().restoreToken();
+    final token = AuthState.instance.currentUser?.accessToken;
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
@@ -53,7 +53,7 @@ class ProfileRemoteDataSource {
       '/rest/v1/pegawai',
       queryParameters: {
         'pegawai_id': 'eq.$pegawaiId',
-        'select': '*',
+        'select': '*,master_divisi(nama_divisi),master_jabatan(nama_jabatan)',
       },
       options: await _buildRequestOptions(),
     );
@@ -61,7 +61,27 @@ class ProfileRemoteDataSource {
     if (response.statusCode == 200 &&
         response.data is List &&
         (response.data as List).isNotEmpty) {
-      return (response.data as List).first as Map<String, dynamic>;
+      final rawDetail = (response.data as List).first as Map<String, dynamic>;
+
+      final divisiData = rawDetail['master_divisi'];
+      final divisiName = divisiData is Map 
+          ? divisiData['nama_divisi']?.toString() ?? ''
+          : (divisiData is List && divisiData.isNotEmpty 
+              ? (divisiData.first as Map)['nama_divisi']?.toString() ?? ''
+              : '');
+
+      final jabatanData = rawDetail['master_jabatan'];
+      final jabatanName = jabatanData is Map 
+          ? jabatanData['nama_jabatan']?.toString() ?? ''
+          : (jabatanData is List && jabatanData.isNotEmpty 
+              ? (jabatanData.first as Map)['nama_jabatan']?.toString() ?? ''
+              : '');
+
+      return {
+        ...rawDetail,
+        'divisi': divisiName,
+        'jabatan': jabatanName,
+      };
     }
 
     return null;
