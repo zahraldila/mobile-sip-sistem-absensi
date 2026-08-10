@@ -77,8 +77,9 @@ class _SubmissionPageState extends State<SubmissionPage> {
             _filter = 'Semua';
           });
         },
-        child: Stack(
-          children: [
+        child: SizedBox.expand(
+          child: Stack(
+            children: [
             SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.only(top: 24, bottom: 96),
@@ -182,7 +183,8 @@ class _SubmissionPageState extends State<SubmissionPage> {
                 },
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
