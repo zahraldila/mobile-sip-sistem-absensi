@@ -1,3 +1,4 @@
+import 'package:bcrypt/bcrypt.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
@@ -7,6 +8,7 @@ import '../services/auth_session_service.dart';
 class AuthService {
   final Dio _dio;
   bool _loggedIn = false;
+  String? lastErrorMessage;
 
   AuthService({Dio? dio})
     : _dio =
@@ -50,92 +52,158 @@ class AuthService {
     required String identifier,
     required String password,
   }) async {
+    lastErrorMessage = null;
     final normalizedIdentifier = identifier.trim();
     final normalizedPassword = password.trim();
 
     if (normalizedIdentifier.isEmpty || normalizedPassword.isEmpty) {
+      lastErrorMessage = 'Email atau username tidak boleh kosong.';
       return null;
     }
 
     try {
       final path = '/rest/v1/akun';
-      final queryParameters = {
-        'select': '*,pegawai!inner(*,master_divisi(nama_divisi),master_jabatan(nama_jabatan))',
-        'pegawai.email': 'eq.$normalizedIdentifier',
-        'password': 'eq.$normalizedPassword',
+      final usernameQuery = {
+        'select': '*',
+        'username': 'eq.$normalizedIdentifier',
+        'limit': '1',
       };
-      final requestUri = Uri.parse(
-        _dio.options.baseUrl,
-      ).resolve(path).replace(queryParameters: queryParameters);
-      final options = await _buildRequestOptions();
 
-      debugPrint('DIO BASE URL = ${_dio.options.baseUrl}');
-      debugPrint('REQUEST PATH = $path');
-      debugPrint('REQUEST URI = $requestUri');
-      debugPrint('REQUEST QUERY = $queryParameters');
-      debugPrint('REQUEST HEADERS = ${options.headers}');
-
-      final response = await _dio.get(
+      final usernameResponse = await _dio.get(
         path,
-        queryParameters: queryParameters,
-        options: options,
+        queryParameters: usernameQuery,
+        options: Options(
+          validateStatus: (status) => status != null && status < 500,
+        ),
       );
 
-      debugPrint('STATUS = ${response.statusCode}');
-      debugPrint('RESPONSE URI = ${response.realUri}');
-      debugPrint('BODY = ${response.data}');
+      debugPrint('AUTH LOGIN username search path=$path query=$usernameQuery');
+      debugPrint('AUTH LOGIN status=${usernameResponse.statusCode}');
+      debugPrint('AUTH LOGIN body=${usernameResponse.data}');
 
-      if (response.statusCode == 200 &&
-          response.data is List &&
-          response.data.isNotEmpty) {
-        final account = (response.data as List).first as Map<String, dynamic>;
-        final pegawaiData = account['pegawai'];
-        final Map<String, dynamic> pegawai = pegawaiData is List
-            ? (pegawaiData.isNotEmpty
-                  ? pegawaiData.first as Map<String, dynamic>
-                  : <String, dynamic>{})
-            : (pegawaiData as Map<String, dynamic>? ?? <String, dynamic>{});
+      Map<String, dynamic>? rawAccount;
 
-        final divisiData = pegawai['master_divisi'];
-        final divisiName = divisiData is Map 
-            ? divisiData['nama_divisi']?.toString() ?? ''
-            : (divisiData is List && divisiData.isNotEmpty 
-                ? (divisiData.first as Map)['nama_divisi']?.toString() ?? ''
-                : '');
-
-        final jabatanData = pegawai['master_jabatan'];
-        final jabatanName = jabatanData is Map 
-            ? jabatanData['nama_jabatan']?.toString() ?? ''
-            : (jabatanData is List && jabatanData.isNotEmpty 
-                ? (jabatanData.first as Map)['nama_jabatan']?.toString() ?? ''
-                : '');
-
-        _loggedIn = true;
-
-        final accessToken = _extractAccessToken(account, response);
-        debugPrint('LOGIN accessToken present=${accessToken.isNotEmpty}');
-
-        return AuthUser(
-          akunId: account['akun_id']?.toString() ?? '',
-          pegawaiId: account['pegawai_id']?.toString() ?? '',
-          username: account['username']?.toString() ?? '',
-          role: account['role']?.toString() ?? '',
-          namaPegawai: pegawai['nama_pegawai']?.toString() ?? '',
-          email: pegawai['email']?.toString() ?? '',
-          jabatan: jabatanName.isNotEmpty ? jabatanName : (pegawai['jabatan']?.toString() ?? ''),
-          divisi: divisiName.isNotEmpty ? divisiName : (pegawai['divisi']?.toString() ?? ''),
-          fotoProfile: pegawai['foto_profile']?.toString() ?? '',
-          accessToken: accessToken,
-        );
+      if (usernameResponse.statusCode == 200 &&
+          usernameResponse.data is List &&
+          (usernameResponse.data as List).isNotEmpty) {
+        final accountCandidate = (usernameResponse.data as List).first;
+        if (accountCandidate is Map<String, dynamic>) {
+          rawAccount = accountCandidate;
+        }
       }
+
+      if (rawAccount == null) {
+        final pegawaiPath = '/rest/v1/pegawai';
+        final pegawaiQuery = {
+          'select': 'pegawai_id',
+          'email': 'ilike.$normalizedIdentifier',
+          'limit': '1',
+        };
+
+        final pegawaiResponse = await _dio.get(
+          pegawaiPath,
+          queryParameters: pegawaiQuery,
+          options: Options(
+            validateStatus: (status) => status != null && status < 500,
+          ),
+        );
+
+        debugPrint('AUTH LOGIN email search path=$pegawaiPath query=$pegawaiQuery');
+        debugPrint('AUTH LOGIN status=${pegawaiResponse.statusCode}');
+        debugPrint('AUTH LOGIN body=${pegawaiResponse.data}');
+
+        if (pegawaiResponse.statusCode == 200 &&
+            pegawaiResponse.data is List &&
+            (pegawaiResponse.data as List).isNotEmpty) {
+          final pegawaiCandidate = (pegawaiResponse.data as List).first;
+          if (pegawaiCandidate is Map<String, dynamic>) {
+            final pegawaiId = pegawaiCandidate['pegawai_id']?.toString() ?? '';
+            if (pegawaiId.isNotEmpty) {
+              final accountByPegawaiQuery = {
+                'select': '*',
+                'pegawai_id': 'eq.$pegawaiId',
+                'limit': '1',
+              };
+
+              final accountResponse = await _dio.get(
+                path,
+                queryParameters: accountByPegawaiQuery,
+                options: Options(
+                  validateStatus: (status) => status != null && status < 500,
+                ),
+              );
+
+              debugPrint('AUTH LOGIN account by pegawai_id path=$path query=$accountByPegawaiQuery');
+              debugPrint('AUTH LOGIN status=${accountResponse.statusCode}');
+              debugPrint('AUTH LOGIN body=${accountResponse.data}');
+
+              if (accountResponse.statusCode == 200 &&
+                  accountResponse.data is List &&
+                  (accountResponse.data as List).isNotEmpty) {
+                final accountCandidate = (accountResponse.data as List).first;
+                if (accountCandidate is Map<String, dynamic>) {
+                  rawAccount = accountCandidate;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (rawAccount == null) {
+        lastErrorMessage = 'Username atau email tidak ditemukan.';
+        return null;
+      }
+
+      final storedPassword = rawAccount['password']?.toString() ?? '';
+      if (storedPassword.isEmpty) {
+        lastErrorMessage = 'Password akun tidak tersedia.';
+        return null;
+      }
+
+      final role = rawAccount['role']?.toString().toLowerCase() ?? '';
+      if (role != 'pegawai' && role != 'karyawan') {
+        lastErrorMessage = 'Akun tidak memiliki akses mobile.';
+        return null;
+      }
+
+      if (!_verifyPassword(normalizedPassword, storedPassword)) {
+        lastErrorMessage = 'Username/email atau password salah.';
+        return null;
+      }
+
+      final akunId = rawAccount['akun_id']?.toString() ?? '';
+      final pegawaiId = rawAccount['pegawai_id']?.toString() ?? '';
+      final username = rawAccount['username']?.toString() ?? '';
+
+      Map<String, dynamic>? pegawaiData;
+      if (pegawaiId.isNotEmpty) {
+        pegawaiData = await getPegawaiDetail(pegawaiId);
+      }
+
+      _loggedIn = true;
+      return AuthUser(
+        akunId: akunId,
+        pegawaiId: pegawaiId,
+        username: username,
+        role: rawAccount['role']?.toString() ?? '',
+        namaPegawai: pegawaiData?['nama_pegawai']?.toString() ??
+            pegawaiData?['namaPegawai']?.toString() ??
+            '',
+        email: pegawaiData?['email']?.toString() ?? '',
+        jabatan: pegawaiData?['jabatan']?.toString() ?? '',
+        divisi: pegawaiData?['divisi']?.toString() ?? '',
+        fotoProfile: pegawaiData?['foto_profile']?.toString() ??
+            pegawaiData?['fotoProfile']?.toString() ??
+            '',
+        accessToken: '',
+      );
     } on DioException catch (e) {
       debugPrint('ERROR');
       debugPrint('${e.response?.statusCode}');
       debugPrint('${e.response?.data}');
       rethrow;
     }
-
-    return null;
   }
 
   Future<bool> isLoggedIn() async {
@@ -236,31 +304,26 @@ class AuthService {
     }
   }
 
-  String _extractAccessToken(Map<String, dynamic> account, Response response) {
-    final candidates = <dynamic>[
-      account['access_token'],
-      account['token'],
-      account['jwt'],
-      if (response.data is Map<String, dynamic>)
-        (response.data as Map<String, dynamic>)['access_token'],
-      if (response.data is Map<String, dynamic>)
-        (response.data as Map<String, dynamic>)['token'],
-      if (response.data is Map<String, dynamic>)
-        (response.data as Map<String, dynamic>)['jwt'],
-      response.headers.value('authorization'),
-    ];
-
-    for (final candidate in candidates) {
-      if (candidate == null) continue;
-      final value = candidate.toString().trim();
-      if (value.isEmpty) continue;
-      if (value.toLowerCase().startsWith('bearer ')) {
-        return value.substring(7).trim();
+  bool _verifyPassword(String inputPassword, String storedPassword) {
+    if (storedPassword.startsWith(r'$2y$') ||
+        storedPassword.startsWith(r'$2a$') ||
+        storedPassword.startsWith(r'$2b$')) {
+      try {
+        return BCrypt.checkpw(inputPassword, storedPassword);
+      } catch (_) {
+        if (storedPassword.startsWith(r'$2y$')) {
+          final normalizedHash = r'$2a$' + storedPassword.substring(4);
+          try {
+            return BCrypt.checkpw(inputPassword, normalizedHash);
+          } catch (_) {
+            return false;
+          }
+        }
+        return false;
       }
-      return value;
     }
 
-    return '';
+    return storedPassword == inputPassword;
   }
 }
 
