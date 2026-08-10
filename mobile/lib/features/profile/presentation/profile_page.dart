@@ -9,6 +9,7 @@ import '../../auth/data/auth_service.dart';
 import '../../auth/domain/entities/auth_user.dart';
 import '../../auth/services/auth_state.dart';
 import '../services/profile_photo_service.dart';
+import '../../attendance/services/attendance_service.dart';
 import 'edit_profile_sheet.dart';
 import 'success_sheet.dart';
 
@@ -29,6 +30,9 @@ class _ProfilePageState extends State<ProfilePage> {
   String _phone = '';
   XFile? _pickedImage;
   String? _savedImagePath;
+
+  String _workHours = '08:30 - 15:30 WIB';
+  String _workLocation = 'Work From Office (WFO)';
 
 
 
@@ -51,7 +55,6 @@ class _ProfilePageState extends State<ProfilePage> {
       };
       _email = currentUser.email;
       _savedImagePath = currentUser.fotoProfile;
-      _isLoading = false;
     });
   }
 
@@ -90,7 +93,6 @@ class _ProfilePageState extends State<ProfilePage> {
           _email = detail['email']?.toString() ?? '';
           _phone = detail['no_handphone']?.toString() ?? '';
           _savedImagePath = resolvedUrl;
-          _isLoading = false;
         });
         if (resolvedUrl.isNotEmpty) {
           await AuthState.instance.updateCurrentUserFotoProfile(resolvedUrl);
@@ -98,17 +100,77 @@ class _ProfilePageState extends State<ProfilePage> {
       } else if (mounted) {
         _loadLocalSessionData(currentUser);
       }
+
+      await _fetchWorkInfo();
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       debugPrint("Offline/Fetch error, loading local session data: $e");
       final currentUser = AuthState.instance.currentUser;
       if (currentUser != null && mounted) {
         _loadLocalSessionData(currentUser);
-      } else if (mounted) {
+      }
+      await _fetchWorkInfo();
+      if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Koneksi bermasalah: $e';
+          if (currentUser == null) {
+            _errorMessage = 'Koneksi bermasalah: $e';
+          }
         });
       }
+    }
+  }
+
+  Future<void> _fetchWorkInfo() async {
+    try {
+      final service = AttendanceService();
+      
+      final schedule = await service.fetchTodaySchedule();
+      String hours = '08:30 - 15:30 WIB';
+      if (schedule != null) {
+        final rawMasuk = schedule['jam_masuk']?.toString() ?? '08:30';
+        final rawPulang = schedule['jam_pulang']?.toString() ?? '15:30';
+        final masukTime = rawMasuk.split(':').take(2).join(':');
+        final pulangTime = rawPulang.split(':').take(2).join(':');
+        hours = '$masukTime - $pulangTime WIB';
+      }
+
+      final currentUser = AuthState.instance.currentUser;
+      String location = 'Work From Office (WFO)';
+      if (currentUser != null) {
+        final submission = await service.fetchTodayApprovedSubmission(currentUser.pegawaiId);
+        if (submission != null) {
+          final jenis = submission['jenis_pengajuan']?.toString().toUpperCase() ?? 'WFO';
+          if (jenis.contains('WFH')) {
+            location = 'Work From Home (WFH)';
+          } else if (jenis.contains('WFC')) {
+            location = 'Work From Client (WFC)';
+          }
+        }
+        
+        final attendance = await service.fetchTodayAttendance(currentUser.pegawaiId);
+        if (attendance != null) {
+          final skema = attendance['skema_kerja']?.toString().toUpperCase() ?? 'WFO';
+          if (skema == 'WFH') {
+            location = 'Work From Home (WFH)';
+          } else if (skema == 'WFC') {
+            location = 'Work From Client (WFC)';
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _workHours = hours;
+          _workLocation = location;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching work info: $e');
     }
   }
 
@@ -659,7 +721,7 @@ Positioned(
                             iconBgColor: const Color(0xFFD1FAE5),
                             iconColor: const Color(0xFF059669),
                             title: 'Jam Kerja',
-                            subtitle: '08.00 - 17.00 WIB',
+                            subtitle: _workHours,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -669,7 +731,7 @@ Positioned(
                             iconBgColor: const Color(0xFFD1FAE5),
                             iconColor: const Color(0xFF059669),
                             title: 'Lokasi Kerja',
-                            subtitle: 'Work From Office (WFO)',
+                            subtitle: _workLocation,
                           ),
                         ),
                       ],

@@ -11,6 +11,7 @@ import 'package:sip_sistem_absensi_mobile/features/attendance/domain/models/atte
 import 'package:sip_sistem_absensi_mobile/features/attendance/presentation/widgets/nfc_tap_dialog.dart';
 import 'package:sip_sistem_absensi_mobile/features/attendance/services/activity_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
+import 'package:sip_sistem_absensi_mobile/features/attendance/services/attendance_service.dart';
 
 class AttendanceHomePage extends StatefulWidget {
   const AttendanceHomePage({super.key});
@@ -23,19 +24,29 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
   late Timer _timer;
   late String _currentTime;
 
+  final _attendanceService = AttendanceService();
+
   // Mode kehadiran hari ini (Default: WFO)
   AttendanceMode currentMode = AttendanceMode.wfo;
 
-  // State absensi — nanti disambungkan ke API/backend.
+  // State absensi
   bool isCheckedIn = false;
   String checkInTime = '08:25';
-  final String attendanceMethod = 'NFC - Validasi Wi-Fi Perusahaan';
+  String attendanceMethod = 'NFC - Validasi Wi-Fi Perusahaan';
+
+  // State tambahan untuk data dinamis database
+  int? todayJadwalId;
+  String todayStartTime = '08:30 WIB';
+  String todayEndTime = '15:30 WIB';
+  bool isAlreadyCheckedOut = false;
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _updateTime();
     _timer = Timer.periodic(const Duration(seconds: 30), (_) => _updateTime());
+    _loadTodayData();
   }
 
   @override
@@ -52,35 +63,145 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
     });
   }
 
+  /// Mengambil data jadwal kerja dan status absensi secara dinamis dari Supabase.
+  Future<void> _loadTodayData() async {
+    if (!mounted) return;
+    setState(() {
+      isLoading = true;
+    });
+
+    final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
+    if (pegawaiId.isEmpty) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+      return;
+    }
+
+    // 1. Ambil Jadwal Kerja Aktif Hari Ini
+    final schedule = await _attendanceService.fetchTodaySchedule();
+    if (schedule != null && mounted) {
+      todayJadwalId = int.tryParse(schedule['jadwal_id']?.toString() ?? '');
+      final rawMasuk = schedule['jam_masuk']?.toString() ?? '08:30';
+      final rawPulang = schedule['jam_pulang']?.toString() ?? '15:30';
+      
+      final masukTime = rawMasuk.split(':').take(2).join(':');
+      final pulangTime = rawPulang.split(':').take(2).join(':');
+      
+      setState(() {
+        todayStartTime = '$masukTime WIB';
+        todayEndTime = '$pulangTime WIB';
+      });
+    }
+
+    // 2. Cek Pengajuan WFH/WFC yang Disetujui Hari Ini
+    final submission = await _attendanceService.fetchTodayApprovedSubmission(pegawaiId);
+    AttendanceMode approvedMode = AttendanceMode.wfo;
+    if (submission != null) {
+      final jenis = submission['jenis_pengajuan']?.toString().toLowerCase() ?? '';
+      if (jenis.contains('wfh')) {
+        approvedMode = AttendanceMode.wfh;
+      } else if (jenis.contains('wfc')) {
+        approvedMode = AttendanceMode.wfc;
+      }
+    }
+
+    // 3. Ambil Status Absensi Hari Ini
+    final attendance = await _attendanceService.fetchTodayAttendance(pegawaiId);
+    if (attendance != null && mounted) {
+      final jamCheckin = attendance['jam_checkin']?.toString();
+      final jamCheckout = attendance['jam_checkout']?.toString();
+      final skema = attendance['skema_kerja']?.toString().toUpperCase() ?? 'WFO';
+      
+      setState(() {
+        if (skema == 'WFH') {
+          currentMode = AttendanceMode.wfh;
+          attendanceMethod = 'GPS & Foto Selfie (WFH)';
+        } else if (skema == 'WFC') {
+          currentMode = AttendanceMode.wfc;
+          attendanceMethod = 'GPS & Foto Selfie (WFC)';
+        } else {
+          currentMode = AttendanceMode.wfo;
+          attendanceMethod = 'NFC - Validasi Wi-Fi Perusahaan';
+        }
+
+        if (jamCheckin != null) {
+          isCheckedIn = jamCheckout == null;
+          isAlreadyCheckedOut = jamCheckout != null;
+          
+          final parsedCheckIn = DateTime.tryParse(jamCheckin)?.toLocal();
+          if (parsedCheckIn != null) {
+            checkInTime = DateFormat('HH:mm').format(parsedCheckIn);
+          }
+        }
+      });
+    } else if (mounted) {
+      setState(() {
+        currentMode = approvedMode;
+        isCheckedIn = false;
+        isAlreadyCheckedOut = false;
+        if (currentMode == AttendanceMode.wfh) {
+          attendanceMethod = 'GPS & Foto Selfie (WFH)';
+        } else if (currentMode == AttendanceMode.wfc) {
+          attendanceMethod = 'GPS & Foto Selfie (WFC)';
+        } else {
+          attendanceMethod = 'NFC - Validasi Wi-Fi Perusahaan';
+        }
+      });
+    }
+
+    if (mounted) {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
   Future<void> _onActionPressed() async {
+    final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
+    if (pegawaiId.isEmpty) return;
+
     if (isCheckedIn) {
       if (currentMode == AttendanceMode.wfo) {
         // Untuk WFO: saat Check Out juga tampilkan Pop Up NFC Tap
         NfcTapDialog.show(
           context,
           isCheckOut: true,
-          onSuccess: () {
-            setState(() {
-              isCheckedIn = false;
-            });
-            // Record check out activity in real-time
-            ActivityService.instance.recordCheckOut();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Check Out WFO Berhasil! Sampai jumpa besok.'),
-                backgroundColor: AppColors.success,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+          onSuccess: () async {
+            try {
+              await _attendanceService.checkOut(
+                pegawaiId: pegawaiId,
+                catatan: 'Check-out WFO',
+              );
+              await _loadTodayData();
+              ActivityService.instance.recordCheckOut();
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Check Out WFO Berhasil! Sampai jumpa besok.'),
+                  backgroundColor: AppColors.success,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            } catch (e) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Gagal mencatat Check Out: $e'),
+                  backgroundColor: AppColors.danger,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
           },
         );
       } else {
         // Untuk WFH / WFC: buka halaman check-out dengan catatan kerja
         final result = await context.push<bool>('/attendance/check-out');
         if (result == true) {
-          setState(() {
-            isCheckedIn = false;
-          });
+          await _loadTodayData();
         }
       }
     } else {
@@ -89,34 +210,41 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         NfcTapDialog.show(
           context,
           isCheckOut: false,
-          onSuccess: () {
-            final nowStr = DateFormat('HH:mm').format(DateTime.now());
-            setState(() {
-              isCheckedIn = true;
-              checkInTime = nowStr;
-            });
-            // Record check in activity in real-time
-            ActivityService.instance.recordCheckIn();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Check In WFO Berhasil ($nowStr WIB)!'),
-                backgroundColor: AppColors.success,
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
+          onSuccess: () async {
+            try {
+              await _attendanceService.checkIn(
+                pegawaiId: pegawaiId,
+                skemaKerja: 'WFO',
+                jadwalId: todayJadwalId,
+                statusKehadiran: 'Hadir',
+              );
+              await _loadTodayData();
+              ActivityService.instance.recordCheckIn();
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Check In WFO Berhasil ($checkInTime WIB)!'),
+                  backgroundColor: AppColors.success,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            } catch (e) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Gagal mencatat Check In: $e'),
+                  backgroundColor: AppColors.danger,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
           },
         );
       } else {
         // Untuk WFH / WFC (setelah disetujui): buka halaman proses selfie & GPS
-        final result = await context.push<bool>('/attendance/check-in');
+        final result = await context.push<bool>('/attendance/check-in', extra: currentMode);
         if (result == true) {
-          final nowStr = DateFormat('HH:mm').format(DateTime.now());
-          setState(() {
-            isCheckedIn = true;
-            checkInTime = nowStr;
-          });
-          // Record check in activity in real-time
-          ActivityService.instance.recordCheckIn();
+          await _loadTodayData();
         }
       }
     }
@@ -126,35 +254,46 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.only(top: 24, bottom: AppSpacing.xl),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: AppSpacing.md),
-            _HomeHeader(name: AuthState.instance.currentUser?.namaPegawai ?? 'Farida'),
-            const SizedBox(height: AppSpacing.xxl),
+      child: RefreshIndicator(
+        onRefresh: _loadTodayData,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.only(top: 24, bottom: AppSpacing.xl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (isLoading) ...[
+                const SizedBox(height: 200),
+                const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
+              ] else ...[
+                const SizedBox(height: AppSpacing.md),
+                _HomeHeader(name: AuthState.instance.currentUser?.namaPegawai ?? 'Farida'),
+                const SizedBox(height: AppSpacing.xxl),
 
-            // [FIX] Updated parameters to match AttendanceStatusCard constructor
-            AttendanceStatusCard(
-              currentTime: _currentTime,
-              isCheckedIn: isCheckedIn,
-              checkInTime: checkInTime,
-              attendanceMethod: attendanceMethod,
-              onActionPressed: _onActionPressed,
-            ),
+                AttendanceStatusCard(
+                  currentTime: _currentTime,
+                  isCheckedIn: isCheckedIn,
+                  checkInTime: checkInTime,
+                  attendanceMethod: attendanceMethod,
+                  onActionPressed: _onActionPressed,
+                  isAlreadyCheckedOut: isAlreadyCheckedOut,
+                ),
 
-            const SizedBox(height: AppSpacing.xxl),
-            WorkScheduleCard(
-              workType: currentMode.fullName,
-              startTime: '08:30 WIB',
-              endTime: '15:30 WIB',
-            ),
+                const SizedBox(height: AppSpacing.xxl),
+                WorkScheduleCard(
+                  workType: currentMode.fullName,
+                  startTime: todayStartTime,
+                  endTime: todayEndTime,
+                ),
 
-            const SizedBox(height: AppSpacing.xxl),
-            const RecentActivityCard(),
-            const SizedBox(height: 96),
-          ],
+                const SizedBox(height: AppSpacing.xxl),
+                const RecentActivityCard(),
+                const SizedBox(height: 96),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -208,6 +347,7 @@ class AttendanceStatusCard extends StatelessWidget {
     required this.checkInTime,
     required this.attendanceMethod,
     required this.onActionPressed,
+    this.isAlreadyCheckedOut = false,
     super.key,
   });
 
@@ -216,6 +356,7 @@ class AttendanceStatusCard extends StatelessWidget {
   final String checkInTime;
   final String attendanceMethod;
   final VoidCallback onActionPressed;
+  final bool isAlreadyCheckedOut;
 
   @override
   Widget build(BuildContext context) {
@@ -239,7 +380,35 @@ class AttendanceStatusCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    if (!isCheckedIn) ...[
+                    if (isAlreadyCheckedOut) ...[
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            size: 24,
+                            color: AppColors.textDisabled,
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'Sudah Check Out',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else if (!isCheckedIn) ...[
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -331,9 +500,11 @@ class AttendanceStatusCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          isCheckedIn
-                              ? 'Check In $checkInTime WIB'
-                              : 'Belum Check In',
+                          isAlreadyCheckedOut
+                              ? 'Sudah Check Out'
+                              : (isCheckedIn
+                                  ? 'Check In $checkInTime WIB'
+                                  : 'Belum Check In'),
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -359,34 +530,44 @@ class AttendanceStatusCard extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: isCheckedIn
-                  ? const Color(0xFFE6F8EE)
-                  : const Color(0xFFFDE8E9),
+              color: isAlreadyCheckedOut
+                  ? const Color(0xFFF1F5F9)
+                  : (isCheckedIn
+                      ? const Color(0xFFE6F8EE)
+                      : const Color(0xFFFDE8E9)),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
               children: [
                 Icon(
-                  isCheckedIn
-                      ? Icons.verified_user_outlined
-                      : Icons.shield_outlined,
-                  color: isCheckedIn
-                      ? const Color(0xFF27AE60)
-                      : const Color(0xFFEB5757),
+                  isAlreadyCheckedOut
+                      ? Icons.check_circle_outline_rounded
+                      : (isCheckedIn
+                          ? Icons.verified_user_outlined
+                          : Icons.shield_outlined),
+                  color: isAlreadyCheckedOut
+                      ? AppColors.textSecondary
+                      : (isCheckedIn
+                          ? const Color(0xFF27AE60)
+                          : const Color(0xFFEB5757)),
                   size: 20,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    isCheckedIn
-                        ? 'Metode: $attendanceMethod'
-                        : 'Anda Belum Melakukan Check In',
+                    isAlreadyCheckedOut
+                        ? 'Absensi selesai hari ini'
+                        : (isCheckedIn
+                            ? 'Metode: $attendanceMethod'
+                            : 'Anda Belum Melakukan Check In'),
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: isCheckedIn
-                          ? const Color(0xFF27AE60)
-                          : const Color(0xFFEB5757),
+                      color: isAlreadyCheckedOut
+                          ? AppColors.textSecondary
+                          : (isCheckedIn
+                              ? const Color(0xFF27AE60)
+                              : const Color(0xFFEB5757)),
                     ),
                   ),
                 ),
@@ -404,7 +585,9 @@ class AttendanceStatusCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isCheckedIn ? 'Belum Check Out' : 'Belum Check In',
+                      isAlreadyCheckedOut
+                          ? 'Kerja Keras Selesai!'
+                          : (isCheckedIn ? 'Belum Check Out' : 'Belum Check In'),
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
@@ -413,9 +596,11 @@ class AttendanceStatusCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      isCheckedIn
-                          ? 'Jangan lupa melakukan check out setelah jam kerja selesai.'
-                          : 'Jangan lupa melakukan check in sebelum jam masuk.',
+                      isAlreadyCheckedOut
+                          ? 'Terima kasih atas kerja keras Anda hari ini. Sampai jumpa esok hari!'
+                          : (isCheckedIn
+                              ? 'Jangan lupa melakukan check out setelah jam kerja selesai.'
+                              : 'Jangan lupa melakukan check in sebelum jam masuk.'),
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF6B7280),
@@ -426,26 +611,27 @@ class AttendanceStatusCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 14),
-              ElevatedButton(
-                onPressed: onActionPressed,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1E60F2),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+              if (!isAlreadyCheckedOut)
+                ElevatedButton(
+                  onPressed: onActionPressed,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E60F2),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
+                    elevation: 0,
                   ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
-                  elevation: 0,
-                ),
-                child: Text(
-                  isCheckedIn ? 'Check Out' : 'Check In',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                  child: Text(
+                    isCheckedIn ? 'Check Out' : 'Check In',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ],

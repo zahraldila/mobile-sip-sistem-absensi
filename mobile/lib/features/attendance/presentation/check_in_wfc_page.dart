@@ -7,6 +7,9 @@ import 'package:sip_sistem_absensi_mobile/core/theme/app_radius.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
 
+import 'package:sip_sistem_absensi_mobile/features/attendance/services/attendance_service.dart';
+import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
+
 /// UI Check In mode Work From Client (WFC).
 /// Metode: Input nama/lokasi klien + GPS + Selfie.
 class CheckInWfcPage extends StatefulWidget {
@@ -88,9 +91,24 @@ class _CheckInWfcPageState extends State<CheckInWfcPage> {
     setState(() => _selfieStatus = _DetectionStatus.success);
   }
 
-  void _submitCheckIn() {
-    _showSnackbar('Check In WFC Berhasil!');
-    Navigator.of(context).pop(true);
+  void _submitCheckIn() async {
+    final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
+    try {
+      await AttendanceService().checkIn(
+        pegawaiId: pegawaiId,
+        skemaKerja: 'WFC',
+        latitude: -6.2146,
+        longitude: 106.8451,
+        fotoSelfie: 'selfie_wfc.jpg',
+        catatan: 'Absen WFC di ${_clientNameController.text} (${_clientAddressController.text})',
+      );
+      _showSnackbar('Check In WFC Berhasil!');
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      _showSnackbar('Gagal melakukan Check In: $e', isError: true);
+    }
   }
 
   void _showSnackbar(String message, {bool isError = false}) {

@@ -9,6 +9,9 @@ import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
 import 'package:sip_sistem_absensi_mobile/features/attendance/services/activity_service.dart';
 
+import 'package:sip_sistem_absensi_mobile/features/attendance/services/attendance_service.dart';
+import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
+
 /// Halaman UI untuk proses Check Out pegawai di akhir jam kerja.
 class CheckOutPage extends StatefulWidget {
   const CheckOutPage({super.key});
@@ -22,7 +25,6 @@ class _CheckOutPageState extends State<CheckOutPage> {
   late String _currentTime;
   late String _currentDate;
 
-  bool _isNotesAdded = false;
   final TextEditingController _notesController = TextEditingController();
   bool _isSubmitting = false;
 
@@ -49,13 +51,32 @@ class _CheckOutPageState extends State<CheckOutPage> {
   }
 
   Future<void> _submitCheckOut() async {
+    final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
     setState(() => _isSubmitting = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-    setState(() => _isSubmitting = false);
+    try {
+      await AttendanceService().checkOut(
+        pegawaiId: pegawaiId,
+        catatan: _notesController.text.trim().isNotEmpty
+            ? _notesController.text.trim()
+            : 'Check-out',
+      );
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
 
-    // Record check out activity in real-time
-    ActivityService.instance.recordCheckOut();
+      // Record check out activity in real-time
+      ActivityService.instance.recordCheckOut();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal melakukan Check Out: $e'),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     showDialog(
       context: context,
@@ -207,7 +228,6 @@ class _CheckOutPageState extends State<CheckOutPage> {
                   TextField(
                     controller: _notesController,
                     maxLines: 4,
-                    onChanged: (val) => setState(() => _isNotesAdded = val.isNotEmpty),
                     style: AppTypography.textTheme.bodyMedium?.copyWith(
                       fontSize: 13,
                       color: AppColors.textPrimary,

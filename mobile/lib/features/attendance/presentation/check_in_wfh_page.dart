@@ -7,6 +7,9 @@ import 'package:sip_sistem_absensi_mobile/core/theme/app_radius.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
 
+import 'package:sip_sistem_absensi_mobile/features/attendance/services/attendance_service.dart';
+import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
+
 /// UI Check In mode Work From Home (WFH).
 /// Metode: GPS/Lokasi + Selfie kamera.
 class CheckInWfhPage extends StatefulWidget {
@@ -69,9 +72,24 @@ class _CheckInWfhPageState extends State<CheckInWfhPage> {
     setState(() => _selfieStatus = _DetectionStatus.success);
   }
 
-  void _submitCheckIn() {
-    _showSnackbar('Check In WFH Berhasil!');
-    Navigator.of(context).pop(true);
+  void _submitCheckIn() async {
+    final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
+    try {
+      await AttendanceService().checkIn(
+        pegawaiId: pegawaiId,
+        skemaKerja: 'WFH',
+        latitude: -6.2000,
+        longitude: 106.8166,
+        fotoSelfie: 'selfie_wfh.jpg',
+        catatan: 'Absen WFH dari Rumah',
+      );
+      _showSnackbar('Check In WFH Berhasil!');
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      _showSnackbar('Gagal melakukan Check In: $e', isError: true);
+    }
   }
 
   void _showSnackbar(String message, {bool isError = false}) {
@@ -535,7 +553,7 @@ class _StepCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (previewWidget != null) previewWidget!,
+            ?previewWidget,
             const SizedBox(height: AppSpacing.sm),
           ],
           if (onAction != null)
