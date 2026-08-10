@@ -189,14 +189,10 @@ class _SubmissionPageState extends State<SubmissionPage> {
   }
 
   void _showDetail(BuildContext context, dynamic item) {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: PengajuanDetailSheet(pengajuan: item),
-      ),
+      useRootNavigator: true,
+      builder: (_) => PengajuanDetailSheet(pengajuan: item),
     );
   }
 }

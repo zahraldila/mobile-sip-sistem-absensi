@@ -471,8 +471,13 @@ Positioned(
                             onTap: () async {
                               final result = await showModalBottomSheet<Map<String, String>>(
                                 context: context,
+                                useRootNavigator: true,
                                 isScrollControlled: true,
                                 backgroundColor: Colors.transparent,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                                ),
+                                clipBehavior: Clip.antiAlias,
                                 builder: (context) => EditProfileSheet(
                                   currentEmail: _email,
                                   currentPhone: _phone,
@@ -520,7 +525,12 @@ Positioned(
                                 if (!context.mounted) return;
                                 await showModalBottomSheet(
                                   context: context,
+                                  useRootNavigator: true,
                                   backgroundColor: Colors.transparent,
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
                                   builder: (context) => const SuccessSheet(
                                     title: 'Berhasil!',
                                     message:

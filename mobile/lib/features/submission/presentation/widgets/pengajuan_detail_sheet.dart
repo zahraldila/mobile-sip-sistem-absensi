@@ -64,125 +64,120 @@ class PengajuanDetailSheet extends StatelessWidget {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.72,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SingleChildScrollView(
-            controller: scrollController,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+      ),
+      clipBehavior: Clip.antiAlias,
+      backgroundColor: AppColors.surface,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Pengajuan ${pengajuan.jenis}',
-                          style: AppTypography.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
+                  Expanded(
+                    child: Text(
+                      'Pengajuan ${pengajuan.jenis}',
+                      style: AppTypography.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
                       ),
-                      StatusBadge(
-                        label: pengajuan.status,
-                        type: _badgeTypeFromStatus(pengajuan.status),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Diajukan pada $_subtitle',
-                    style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _detailColor.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: _detailColor.withOpacity(0.16),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Icon(_detailIcon, color: _detailColor, size: 24),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _detailMessage,
-                            style: AppTypography.textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Text('Informasi Pengajuan', style: AppTypography.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 16),
-                  _DetailInfoCard(
-                    icon: Icons.calendar_month,
-                    title: 'Tanggal Pengajuan',
-                    subtitle: _tanggalPengajuan,
-                  ),
-                  const SizedBox(height: 12),
-                  _DetailInfoCard(
-                    icon: Icons.location_on_outlined,
-                    title: 'Lokasi Kerja',
-                    subtitle: _lokasiKerja,
-                  ),
-                  const SizedBox(height: 12),
-                  _DetailInfoCard(
-                    icon: Icons.description_outlined,
-                    title: 'Alasan/Keterangan',
-                    subtitle: pengajuan.keterangan?.trim().isNotEmpty == true ? pengajuan.keterangan! : 'Tidak ada keterangan.',
-                  ),
-                  const SizedBox(height: 20),
-                  Text('Lampiran', style: AppTypography.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 12),
-                  if (pengajuan.lampiran != null && pengajuan.lampiran!.trim().isNotEmpty) ...[
-                    _AttachmentCard(fileName: pengajuan.lampiran!),
-                  ] else ...[
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceAlt,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Text('Tidak ada lampiran.', style: AppTypography.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: Text('Tutup', style: AppTypography.textTheme.labelLarge?.copyWith(color: Colors.white)),
+                  StatusBadge(
+                    label: pengajuan.status,
+                    type: _badgeTypeFromStatus(pengajuan.status),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 8),
+              Text(
+                'Diajukan pada $_subtitle',
+                style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _detailColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: _detailColor.withOpacity(0.16),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(_detailIcon, color: _detailColor, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _detailMessage,
+                        style: AppTypography.textTheme.bodyMedium?.copyWith(color: AppColors.textPrimary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text('Informasi Pengajuan', style: AppTypography.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 16),
+              _DetailInfoCard(
+                icon: Icons.calendar_month,
+                title: 'Tanggal Pengajuan',
+                subtitle: _tanggalPengajuan,
+              ),
+              const SizedBox(height: 12),
+              _DetailInfoCard(
+                icon: Icons.location_on_outlined,
+                title: 'Lokasi Kerja',
+                subtitle: _lokasiKerja,
+              ),
+              const SizedBox(height: 12),
+              _DetailInfoCard(
+                icon: Icons.description_outlined,
+                title: 'Alasan/Keterangan',
+                subtitle: pengajuan.keterangan?.trim().isNotEmpty == true ? pengajuan.keterangan! : 'Tidak ada keterangan.',
+              ),
+              const SizedBox(height: 20),
+              Text('Lampiran', style: AppTypography.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              if (pengajuan.lampiran != null && pengajuan.lampiran!.trim().isNotEmpty) ...[
+                _AttachmentCard(fileName: pengajuan.lampiran!),
+              ] else ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceAlt,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text('Tidak ada lampiran.', style: AppTypography.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
+                ),
+              ],
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: Text('Tutup', style: AppTypography.textTheme.labelLarge?.copyWith(color: Colors.white)),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
