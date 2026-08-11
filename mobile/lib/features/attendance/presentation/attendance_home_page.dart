@@ -212,8 +212,13 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         // Untuk WFO: Tampilkan Bottom Sheet Pilihan Metode Check In
         showModalBottomSheet(
           context: context,
-          backgroundColor: Colors.transparent,
+          useRootNavigator: true,
           isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          clipBehavior: Clip.antiAlias,
           builder: (context) => CheckInMethodSelectionSheet(
             onNfcSelected: () {
               Navigator.pop(context); // Tutup Bottom Sheet
