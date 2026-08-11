@@ -526,12 +526,13 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
                 _HomeHeader(name: AuthState.instance.currentUser?.namaPegawai ?? 'Farida'),
                 const SizedBox(height: AppSpacing.xxl),
 
-                AttendanceStatusCard(
+                 AttendanceStatusCard(
                   currentTime: _currentTime,
                   isCheckedIn: isCheckedIn,
                   checkInTime: checkInTime,
                   attendanceMethod: attendanceMethod,
                   onActionPressed: _onActionPressed,
+                  todayStartTime: todayStartTime,
                   isAlreadyCheckedOut: isAlreadyCheckedOut,
                 ),
 
@@ -601,6 +602,7 @@ class AttendanceStatusCard extends StatelessWidget {
     required this.checkInTime,
     required this.attendanceMethod,
     required this.onActionPressed,
+    required this.todayStartTime,
     this.isAlreadyCheckedOut = false,
     super.key,
   });
@@ -611,9 +613,50 @@ class AttendanceStatusCard extends StatelessWidget {
   final String attendanceMethod;
   final VoidCallback onActionPressed;
   final bool isAlreadyCheckedOut;
+  final String todayStartTime;
+
+  String? _calculateLateness(String checkIn, String start) {
+    try {
+      final cleanCheckIn = checkIn.replaceAll(RegExp(r'[^0-9:]'), '').trim();
+      final cleanStart = start.replaceAll(RegExp(r'[^0-9:]'), '').trim();
+
+      final checkInParts = cleanCheckIn.split(':');
+      final startParts = cleanStart.split(':');
+
+      if (checkInParts.length < 2 || startParts.length < 2) return null;
+
+      final checkInHour = int.parse(checkInParts[0]);
+      final checkInMin = int.parse(checkInParts[1]);
+
+      final startHour = int.parse(startParts[0]);
+      final startMin = int.parse(startParts[1]);
+
+      final checkInTotalMinutes = checkInHour * 60 + checkInMin;
+      final startTotalMinutes = startHour * 60 + startMin;
+
+      final diffMinutes = checkInTotalMinutes - startTotalMinutes;
+
+      if (diffMinutes <= 0) return null;
+
+      final diffHour = diffMinutes ~/ 60;
+      final diffMin = diffMinutes % 60;
+
+      if (diffHour > 0) {
+        return 'Terlambat $diffHour jam $diffMin menit';
+      } else {
+        return 'Terlambat $diffMin menit';
+      }
+    } catch (e) {
+      debugPrint('[AttendanceStatusCard] Error calculating lateness: $e');
+      return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final latenessText = isCheckedIn && !isAlreadyCheckedOut
+        ? _calculateLateness(checkInTime, todayStartTime)
+        : null;
     return PrimaryCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -753,16 +796,33 @@ class AttendanceStatusCard extends StatelessWidget {
                           color: Color(0xFF6B7280),
                         ),
                         const SizedBox(width: 6),
-                        Text(
-                          isAlreadyCheckedOut
-                              ? 'Sudah Check Out'
-                              : (isCheckedIn
-                                  ? 'Check In $checkInTime WIB'
-                                  : 'Belum Check In'),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF6B7280),
+                        Expanded(
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: isAlreadyCheckedOut
+                                      ? 'Sudah Check Out'
+                                      : (isCheckedIn
+                                          ? 'Check In $checkInTime WIB'
+                                          : 'Belum Check In'),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                ),
+                                if (latenessText != null)
+                                  TextSpan(
+                                    text: ' ($latenessText)',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.danger,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ],
