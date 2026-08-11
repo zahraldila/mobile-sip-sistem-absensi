@@ -7,7 +7,6 @@ import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_radius.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
-import 'package:sip_sistem_absensi_mobile/features/attendance/services/activity_service.dart';
 
 import 'package:sip_sistem_absensi_mobile/features/attendance/services/attendance_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
@@ -63,8 +62,6 @@ class _CheckOutPageState extends State<CheckOutPage> {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
 
-      // Record check out activity in real-time
-      ActivityService.instance.recordCheckOut();
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);

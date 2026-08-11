@@ -171,38 +171,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
 
     if (isCheckedIn) {
       if (currentMode == AttendanceMode.wfo) {
-        // Untuk WFO: saat Check Out juga tampilkan Pop Up NFC Tap
-        NfcTapDialog.show(
-          context,
-          isCheckOut: true,
-          onSuccess: () async {
-            try {
-              await _attendanceService.checkOut(
-                pegawaiId: pegawaiId,
-                catatan: 'Check-out WFO',
-              );
-              await _loadTodayData();
-              ActivityService.instance.recordCheckOut();
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Check Out WFO Berhasil! Sampai jumpa besok.'),
-                  backgroundColor: AppColors.success,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            } catch (e) {
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Gagal mencatat Check Out: $e'),
-                  backgroundColor: AppColors.danger,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-          },
-        );
+        _handleWfoCheckOutFlow(pegawaiId);
       } else {
         // Untuk WFH / WFC: buka halaman check-out dengan catatan kerja
         final result = await context.push<bool>('/attendance/check-out');
@@ -239,6 +208,239 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         if (result == true) {
           await _loadTodayData();
         }
+      }
+    }
+  }
+
+  bool _isEarlyCheckOut() {
+    if (todayEndTime.isEmpty) return false;
+    try {
+      final cleanEnd = todayEndTime.replaceAll(RegExp(r'[^0-9:]'), '').trim();
+      final parts = cleanEnd.split(':');
+      if (parts.length < 2) return false;
+
+      final endHour = int.parse(parts[0]);
+      final endMin = int.parse(parts[1]);
+
+      final now = DateTime.now();
+      final nowTotalMinutes = now.hour * 60 + now.minute;
+      final endTotalMinutes = endHour * 60 + endMin;
+
+      return nowTotalMinutes < endTotalMinutes;
+    } catch (e) {
+      debugPrint('[AttendanceHomePage] Error parsing end time: $e');
+      return false;
+    }
+  }
+
+  Future<void> _handleWfoCheckOutFlow(String pegawaiId) async {
+    final isEarly = _isEarlyCheckOut();
+    if (isEarly) {
+      final reason = await _showEarlyCheckOutDialog();
+      if (reason == null) return; // User cancelled
+      _showCheckOutMethodSelection(pegawaiId, reason: reason);
+    } else {
+      _showCheckOutMethodSelection(pegawaiId);
+    }
+  }
+
+  Future<String?> _showEarlyCheckOutDialog() {
+    return showModalBottomSheet<String>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      builder: (context) => EarlyCheckOutSheet(endTime: todayEndTime),
+    );
+  }
+
+  void _showCheckOutMethodSelection(String pegawaiId, {String? reason}) {
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      builder: (context) => CheckOutMethodSelectionSheet(
+        onNfcSelected: () {
+          Navigator.pop(context);
+          _triggerNfcCheckOut(pegawaiId, reason: reason);
+        },
+        onWiFiSelected: () {
+          Navigator.pop(context);
+          _triggerWiFiCheckOut(pegawaiId, reason: reason);
+        },
+      ),
+    );
+  }
+
+  void _triggerNfcCheckOut(String pegawaiId, {String? reason}) {
+    NfcTapDialog.show(
+      context,
+      isCheckOut: true,
+      onSuccess: () async {
+        await _performWfoCheckOut(pegawaiId, method: 'Sensor NFC', reason: reason);
+      },
+    );
+  }
+
+  Future<void> _triggerWiFiCheckOut(String pegawaiId, {String? reason}) async {
+    BuildContext? dialogContext;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        dialogContext = ctx;
+        return const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        );
+      },
+    );
+
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    try {
+      try {
+        final status = await Permission.location.status;
+        if (status.isDenied) {
+          await Permission.location.request();
+        }
+      } catch (pe) {
+        debugPrint('[AttendanceHomePage] Error requesting location permission: $pe');
+      }
+
+      final officeWiFis = await _attendanceService.fetchActiveOfficeWiFi();
+
+      final info = NetworkInfo();
+      String? currentSsid;
+      try {
+        currentSsid = await info.getWifiName();
+        if (currentSsid != null) {
+          currentSsid = currentSsid.trim().replaceAll('"', '').replaceAll("'", "");
+        }
+      } catch (e) {
+        debugPrint('[AttendanceHomePage] Error reading WiFi SSID: $e');
+      }
+
+      if (dialogContext != null) {
+        Navigator.pop(dialogContext!);
+      }
+
+      if (officeWiFis.isEmpty) {
+        _showWiFiFailureDialog(
+          pegawaiId: pegawaiId,
+          detectedSsid: currentSsid,
+          officeSsids: [],
+          errorMsg: 'Tidak ada WiFi Kantor aktif yang terdaftar di database.',
+          isCheckOut: true,
+          reason: reason,
+        );
+        return;
+      }
+
+      final officeSsids = officeWiFis
+          .map((w) => w['ssid']?.toString().trim().replaceAll('"', '').replaceAll("'", "") ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      bool isMatched = false;
+      if (currentSsid != null && currentSsid.isNotEmpty) {
+        isMatched = officeSsids.any((officeSsid) =>
+            officeSsid.toLowerCase() == currentSsid!.toLowerCase());
+      }
+
+      if (isMatched) {
+        await _performWfoCheckOut(
+          pegawaiId,
+          method: 'WiFi Kantor ($currentSsid)',
+          reason: reason,
+        );
+      } else {
+        _showWiFiFailureDialog(
+          pegawaiId: pegawaiId,
+          detectedSsid: currentSsid,
+          officeSsids: officeSsids,
+          isCheckOut: true,
+          reason: reason,
+        );
+      }
+    } catch (e) {
+      if (dialogContext != null) {
+        Navigator.pop(dialogContext!);
+      }
+      _showWiFiFailureDialog(
+        pegawaiId: pegawaiId,
+        detectedSsid: null,
+        officeSsids: [],
+        errorMsg: 'Terjadi kegagalan sistem deteksi WiFi: $e',
+        isCheckOut: true,
+        reason: reason,
+      );
+    }
+  }
+
+  Future<void> _performWfoCheckOut(String pegawaiId, {required String method, String? reason}) async {
+    BuildContext? dialogContext;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        dialogContext = ctx;
+        return const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        );
+      },
+    );
+
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    try {
+      final note = reason != null
+          ? 'Check-out via $method (Alasan: $reason)'
+          : 'Check-out via $method';
+
+      await _attendanceService.checkOut(
+        pegawaiId: pegawaiId,
+        catatan: note,
+      );
+
+      if (dialogContext != null) {
+        Navigator.pop(dialogContext!);
+      }
+
+      await _loadTodayData();
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => SuccessDialog(
+            title: 'Check Out Berhasil!',
+            description: reason != null
+                ? 'Anda berhasil check out lebih awal dengan alasan: $reason.'
+                : 'Anda berhasil melakukan check out via $method.',
+            onClose: () => Navigator.pop(context),
+          ),
+        );
+      }
+    } catch (e) {
+      if (dialogContext != null) {
+        Navigator.pop(dialogContext!);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal mencatat Check Out: $e'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }
@@ -378,7 +580,6 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       }
 
       await _loadTodayData();
-      ActivityService.instance.recordCheckIn();
 
       // Tampilkan SuccessDialog dengan format desain dari figma/mockup
       if (mounted) {
@@ -413,19 +614,21 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
     required String? detectedSsid,
     required List<String> officeSsids,
     String? errorMsg,
+    bool isCheckOut = false,
+    String? reason,
   }) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.wifi_off_rounded, color: Colors.amber, size: 28),
-            SizedBox(width: 10),
+            const Icon(Icons.wifi_off_rounded, color: Colors.amber, size: 28),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'WiFi Kantor Tidak Sesuai',
-                style: TextStyle(
+                isCheckOut ? 'WiFi Kantor Tidak Sesuai (Check Out)' : 'WiFi Kantor Tidak Sesuai',
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -489,7 +692,11 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              _performWfoCheckIn(pegawaiId, method: 'Simulasi WiFi Kantor');
+              if (isCheckOut) {
+                _performWfoCheckOut(pegawaiId, method: 'Simulasi WiFi Kantor', reason: reason);
+              } else {
+                _performWfoCheckIn(pegawaiId, method: 'Simulasi WiFi Kantor');
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEFF6FF),
@@ -1572,6 +1779,406 @@ class CheckInMethodSelectionSheet extends StatelessWidget {
               Icon(Icons.chevron_right_rounded, color: Colors.grey[400]),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class CheckOutMethodSelectionSheet extends StatelessWidget {
+  final VoidCallback onNfcSelected;
+  final VoidCallback onWiFiSelected;
+
+  const CheckOutMethodSelectionSheet({
+    super.key,
+    required this.onNfcSelected,
+    required this.onWiFiSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Handle Indicator
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          // Title
+          const Text(
+            'Pilih Metode Check Out WFO',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Silakan verifikasi kepulangan Anda menggunakan salah satu metode di bawah ini.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Option 1: Tap NFC
+          _buildMethodCard(
+            icon: Icons.nfc_rounded,
+            iconColor: const Color(0xFF2563EB), // Blue
+            bgColor: const Color(0xFFEFF6FF),
+            title: 'Tap Kartu NFC',
+            description: 'Tempelkan kartu pegawai ke bagian belakang ponsel Anda.',
+            onTap: onNfcSelected,
+          ),
+          const SizedBox(height: 16),
+
+          // Option 2: WiFi Kantor
+          _buildMethodCard(
+            icon: Icons.wifi_rounded,
+            iconColor: const Color(0xFF059669), // Green
+            bgColor: const Color(0xFFECFDF5),
+            title: 'WiFi Kantor',
+            description: 'Verifikasi kepulangan otomatis dengan tersambung ke WiFi kantor.',
+            onTap: onWiFiSelected,
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMethodCard({
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required String title,
+    required String description,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey[200]!, width: 1.5),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: Colors.grey[400]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class EarlyCheckOutSheet extends StatefulWidget {
+  final String endTime;
+
+  const EarlyCheckOutSheet({
+    super.key,
+    required this.endTime,
+  });
+
+  @override
+  State<EarlyCheckOutSheet> createState() => _EarlyCheckOutSheetState();
+}
+
+class _EarlyCheckOutSheetState extends State<EarlyCheckOutSheet> {
+  String selectedCategory = 'Dinas Luar / Bertemu Klien';
+  final textController = TextEditingController();
+  final formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    textController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Form(
+        key: formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Handle Indicator
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Warning Icon & Title Row
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFEF3C7), // Light amber
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.warning_rounded,
+                    color: Color(0xFFD97706), // Amber
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Check Out Lebih Awal',
+                    style: AppTypography.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Subtitle Warning Text
+            Text(
+              'Jam kerja Anda baru berakhir pada ${widget.endTime}. Apakah Anda yakin ingin melakukan check-out sekarang?',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[600],
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Label 1: Alasan Check Out
+            Text(
+              'Alasan Check Out',
+              style: AppTypography.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Dropdown Field
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey[300]!, width: 1.5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: selectedCategory,
+                  isExpanded: true,
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.grey),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  items: [
+                    'Dinas Luar / Bertemu Klien',
+                    'Sakit / Kurang Sehat',
+                    'Keperluan Pribadi Mendesak',
+                    'Lainnya',
+                  ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        selectedCategory = val;
+                      });
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Label 2: Keterangan
+            Text(
+              'Keterangan Tambahan',
+              style: AppTypography.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // TextFormField
+            TextFormField(
+              controller: textController,
+              maxLines: 3,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: selectedCategory == 'Lainnya'
+                    ? 'Tulis alasan rinci Anda di sini...'
+                    : 'Tambahkan catatan jika ada (opsional)...',
+                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+                filled: true,
+                fillColor: const Color(0xFFF9FAFB),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[200]!, width: 1.5),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              validator: (value) {
+                if (selectedCategory == 'Lainnya' && (value == null || value.trim().isEmpty)) {
+                  return 'Keterangan wajib diisi untuk alasan Lainnya';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 24),
+
+            // Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: BorderSide(color: Colors.grey[300]!),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'Batal',
+                      style: TextStyle(
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (formKey.currentState?.validate() == true) {
+                        final detail = textController.text.trim();
+                        final fullReason = detail.isNotEmpty
+                            ? '$selectedCategory: $detail'
+                            : selectedCategory;
+                        Navigator.pop(context, fullReason);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Lanjut',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
