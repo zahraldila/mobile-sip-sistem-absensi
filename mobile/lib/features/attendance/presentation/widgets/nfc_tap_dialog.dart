@@ -123,15 +123,6 @@ class _NfcTapDialogState extends State<NfcTapDialog> {
                         letterSpacing: -0.2,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      '(Ketuk popup untuk simulasi tap kartu NFC)',
-                      textAlign: TextAlign.center,
-                      style: AppTypography.textTheme.bodySmall?.copyWith(
-                        fontSize: 10,
-                        color: AppColors.textDisabled,
-                      ),
-                    ),
                   ] else ...[
                     // Success State
                     Container(
