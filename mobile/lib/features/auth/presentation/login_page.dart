@@ -54,7 +54,7 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     if (!success) {
-      _showSnackbar('Username atau Password salah.');
+      _showSnackbar(AuthState.instance.lastErrorMessage ?? 'Username atau password salah.');
       return;
     }
 
@@ -147,7 +147,7 @@ class _LoginPageState extends State<LoginPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Email',
+                              'Email / Username',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w700,
@@ -211,7 +211,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'Email tidak boleh kosong';
+                                  return 'Email atau username tidak boleh kosong';
                                 }
                                 return null;
                               },

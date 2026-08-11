@@ -25,6 +25,8 @@ class AuthState extends ChangeNotifier {
     notifyListeners();
   }
 
+  String? get lastErrorMessage => _authService.lastErrorMessage;
+
   Future<bool> login({
     required String identifier,
     required String password,
@@ -42,7 +44,7 @@ class AuthState extends ChangeNotifier {
         accessToken: user.accessToken,
       );
     } else {
-      await _sessionService.clearSession();
+      await _sessionService.persistToken(user.accessToken);
     }
     notifyListeners();
     return true;

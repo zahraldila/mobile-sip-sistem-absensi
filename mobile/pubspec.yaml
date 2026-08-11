@@ -55,6 +55,7 @@ dependencies:
   cached_network_image: ^3.3.1
   file_selector: ^1.0.3
   network_info_plus: ^8.2.1
+  bcrypt: ^1.2.0
 
 dev_dependencies:
   flutter_test:
