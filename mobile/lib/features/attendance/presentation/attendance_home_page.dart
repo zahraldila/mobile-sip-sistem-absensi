@@ -83,6 +83,9 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       return;
     }
 
+    // Ambil data aktivitas terbaru secara riil dari database
+    await ActivityService.instance.loadActivitiesFromDatabase(pegawaiId);
+
     // 1. Ambil Jadwal Kerja Aktif Hari Ini
     final schedule = await _attendanceService.fetchTodaySchedule();
     if (schedule != null && mounted) {

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:dio/dio.dart';
+import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
+import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 
 /// Model untuk merepresentasikan item aktivitas pengguna.
 class ActivityItemData {
@@ -135,6 +138,7 @@ class ActivityService extends ChangeNotifier {
   List<ActivityItemData> get activities => List.unmodifiable(_activities);
 
   void _initDefaultActivities() {
+    // Keep mock data as initial state before DB sync completes
     _activities.addAll([
       ActivityItemData.checkIn(
         timeText: 'Hari Ini, 08:25 WIB',
@@ -150,19 +154,143 @@ class ActivityService extends ChangeNotifier {
         timeText: 'Kemarin, 15.30 WIB',
         createdAt: DateTime.now().subtract(const Duration(days: 1)),
       ),
-      ActivityItemData.info(
-        title: 'Perubahan Jadwal',
-        subtitle: 'Jadwal kerja anda telah diperbarui',
-        timeText: '2 hari lalu, 09.15 WIB',
-        createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      ),
-      ActivityItemData.info(
-        title: 'Perubahan Jadwal',
-        subtitle: 'Jadwal kerja anda telah diperbarui',
-        timeText: '2 hari lalu, 09.15 WIB',
-        createdAt: DateTime.now().subtract(const Duration(days: 2, hours: 2)),
-      ),
     ]);
+  }
+
+  /// Memuat aktivitas absensi dan pengajuan nyata dari database
+  Future<void> loadActivitiesFromDatabase(String pegawaiId) async {
+    if (pegawaiId.isEmpty) return;
+
+    try {
+      final token = AuthState.instance.currentUser?.accessToken;
+      final headers = {
+        'apikey': SupabaseConfig.anonKey,
+        'Authorization': 'Bearer ${token != null && token.isNotEmpty ? token : SupabaseConfig.anonKey}',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      final dio = Dio(BaseOptions(baseUrl: SupabaseConfig.url, headers: headers));
+
+      // 1. Ambil data absensi terbaru
+      final absensiResponse = await dio.get(
+        '/rest/v1/absensi',
+        queryParameters: {
+          'pegawai_id': 'eq.$pegawaiId',
+          'order': 'tanggal_absensi.desc,jam_checkin.desc',
+          'limit': '5',
+        },
+      );
+
+      // 2. Ambil data pengajuan terbaru
+      final pengajuanResponse = await dio.get(
+        '/rest/v1/pengajuan',
+        queryParameters: {
+          'pegawai_id': 'eq.$pegawaiId',
+          'order': 'tanggal_pengajuan.desc',
+          'limit': '5',
+        },
+      );
+
+      final List<ActivityItemData> newActivities = [];
+
+      // Parse absensi
+      if (absensiResponse.statusCode == 200 && absensiResponse.data is List) {
+        final list = absensiResponse.data as List;
+        for (final item in list) {
+          final map = item as Map<String, dynamic>;
+
+          // Check In
+          final checkInStr = map['jam_checkin']?.toString();
+          if (checkInStr != null && checkInStr.isNotEmpty) {
+            final checkInTime = DateTime.tryParse(checkInStr)?.toLocal();
+            if (checkInTime != null) {
+              newActivities.add(ActivityItemData.checkIn(
+                id: 'checkin_${map['absensi_id'] ?? checkInStr}',
+                timeText: _formatActivityTime(checkInTime),
+                createdAt: checkInTime,
+              ));
+            }
+          }
+
+          // Check Out
+          final checkOutStr = map['jam_checkout']?.toString();
+          if (checkOutStr != null && checkOutStr.isNotEmpty) {
+            final checkOutTime = DateTime.tryParse(checkOutStr)?.toLocal();
+            if (checkOutTime != null) {
+              newActivities.add(ActivityItemData.checkOut(
+                id: 'checkout_${map['absensi_id'] ?? checkOutStr}',
+                timeText: _formatActivityTime(checkOutTime),
+                createdAt: checkOutTime,
+              ));
+            }
+          }
+        }
+      }
+
+      // Parse pengajuan
+      if (pengajuanResponse.statusCode == 200 && pengajuanResponse.data is List) {
+        final list = pengajuanResponse.data as List;
+        for (final item in list) {
+          final map = item as Map<String, dynamic>;
+          final dateStr = map['tanggal_pengajuan']?.toString() ?? '';
+          final jenis = map['jenis_pengajuan']?.toString() ?? 'Pengajuan';
+          final status = map['status_pengajuan']?.toString() ?? 'Pending';
+          final id = map['pengajuan_id']?.toString() ?? dateStr;
+
+          final date = DateTime.tryParse(dateStr)?.toLocal() ?? DateTime.now();
+          newActivities.add(ActivityItemData.pengajuan(
+            id: 'pengajuan_$id',
+            title: 'Pengajuan $jenis',
+            subtitle: 'Pengajuan $jenis Anda sedang berstatus $status',
+            timeText: _formatActivityDateOnly(date),
+            status: status,
+            createdAt: date,
+          ));
+        }
+      }
+
+      // Urutkan berdasarkan waktu terbaru
+      newActivities.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      _activities.clear();
+      _activities.addAll(newActivities);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[ActivityService] Error loading activities from DB: $e');
+    }
+  }
+
+  String _formatActivityTime(DateTime dt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final dtDay = DateTime(dt.year, dt.month, dt.day);
+
+    final timeStr = DateFormat('HH:mm').format(dt);
+
+    if (dtDay == today) {
+      return 'Hari Ini, $timeStr WIB';
+    } else if (dtDay == yesterday) {
+      return 'Kemarin, $timeStr WIB';
+    } else {
+      return '${DateFormat('dd MMM').format(dt)}, $timeStr WIB';
+    }
+  }
+
+  String _formatActivityDateOnly(DateTime dt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final dtDay = DateTime(dt.year, dt.month, dt.day);
+
+    if (dtDay == today) {
+      return 'Hari Ini';
+    } else if (dtDay == yesterday) {
+      return 'Kemarin';
+    } else {
+      return DateFormat('dd MMM yyyy').format(dt);
+    }
   }
 
   /// Tambah aktivitas Check In secara real-time
