@@ -12,6 +12,9 @@ import 'package:sip_sistem_absensi_mobile/features/attendance/presentation/widge
 import 'package:sip_sistem_absensi_mobile/features/attendance/services/activity_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 import 'package:sip_sistem_absensi_mobile/features/attendance/services/attendance_service.dart';
+import 'package:network_info_plus/network_info_plus.dart';
+import 'package:sip_sistem_absensi_mobile/core/widgets/success_dialog.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class AttendanceHomePage extends StatefulWidget {
   const AttendanceHomePage({super.key});
@@ -206,39 +209,21 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       }
     } else {
       if (currentMode == AttendanceMode.wfo) {
-        // Untuk WFO: langsung tampilkan Pop Up NFC sesuai desain
-        NfcTapDialog.show(
-          context,
-          isCheckOut: false,
-          onSuccess: () async {
-            try {
-              await _attendanceService.checkIn(
-                pegawaiId: pegawaiId,
-                skemaKerja: 'WFO',
-                jadwalId: todayJadwalId,
-                statusKehadiran: 'Hadir',
-              );
-              await _loadTodayData();
-              ActivityService.instance.recordCheckIn();
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Check In WFO Berhasil ($checkInTime WIB)!'),
-                  backgroundColor: AppColors.success,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            } catch (e) {
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Gagal mencatat Check In: $e'),
-                  backgroundColor: AppColors.danger,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-          },
+        // Untuk WFO: Tampilkan Bottom Sheet Pilihan Metode Check In
+        showModalBottomSheet(
+          context: context,
+          backgroundColor: Colors.transparent,
+          isScrollControlled: true,
+          builder: (context) => CheckInMethodSelectionSheet(
+            onNfcSelected: () {
+              Navigator.pop(context); // Tutup Bottom Sheet
+              _triggerNfcCheckIn(pegawaiId);
+            },
+            onWiFiSelected: () {
+              Navigator.pop(context); // Tutup Bottom Sheet
+              _triggerWiFiCheckIn(pegawaiId);
+            },
+          ),
         );
       } else {
         // Untuk WFH / WFC (setelah disetujui): buka halaman proses selfie & GPS
@@ -248,6 +233,270 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         }
       }
     }
+  }
+
+  /// Menjalankan Check In WFO menggunakan sensor/simulasi NFC secara aman.
+  void _triggerNfcCheckIn(String pegawaiId) {
+    NfcTapDialog.show(
+      context,
+      isCheckOut: false,
+      onSuccess: () async {
+        await _performWfoCheckIn(pegawaiId, method: 'Sensor NFC');
+      },
+    );
+  }
+
+  /// Menjalankan verifikasi WiFi untuk Check In WFO.
+  Future<void> _triggerWiFiCheckIn(String pegawaiId) async {
+    BuildContext? dialogContext;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        dialogContext = ctx;
+        return const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        );
+      },
+    );
+
+    // Memberi waktu 100ms agar dialog route didaftarkan sepenuhnya ke Navigator
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    try {
+      // Minta izin lokasi di Android agar diperbolehkan membaca SSID WiFi
+      try {
+        final status = await Permission.location.status;
+        if (status.isDenied) {
+          await Permission.location.request();
+        }
+      } catch (pe) {
+        debugPrint('[AttendanceHomePage] Error requesting location permission: $pe');
+      }
+
+      // 1. Ambil daftar wifi kantor aktif dari database
+      final officeWiFis = await _attendanceService.fetchActiveOfficeWiFi();
+
+      // 2. Baca SSID WiFi perangkat lokal
+      final info = NetworkInfo();
+      String? currentSsid;
+      try {
+        currentSsid = await info.getWifiName();
+        if (currentSsid != null) {
+          currentSsid = currentSsid.trim().replaceAll('"', '').replaceAll("'", "");
+        }
+      } catch (e) {
+        debugPrint('[AttendanceHomePage] Error reading WiFi SSID: $e');
+      }
+
+      if (dialogContext != null) {
+        Navigator.pop(dialogContext!); // Tutup loading dialog secara aman menggunakan dialogContext
+      }
+
+      if (officeWiFis.isEmpty) {
+        _showWiFiFailureDialog(
+          pegawaiId: pegawaiId,
+          detectedSsid: currentSsid,
+          officeSsids: [],
+          errorMsg: 'Tidak ada WiFi Kantor aktif yang terdaftar di database.',
+        );
+        return;
+      }
+
+      // Ambil seluruh nama SSID kantor yang aktif
+      final officeSsids = officeWiFis
+          .map((w) => w['ssid']?.toString().trim().replaceAll('"', '').replaceAll("'", "") ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      // 3. Cocokkan SSID ponsel dengan daftar SSID kantor
+      bool isMatched = false;
+      if (currentSsid != null && currentSsid.isNotEmpty) {
+        isMatched = officeSsids.any((officeSsid) =>
+            officeSsid.toLowerCase() == currentSsid!.toLowerCase());
+      }
+
+      if (isMatched) {
+        // Cocok! Jalankan Check In langsung
+        await _performWfoCheckIn(pegawaiId, method: 'WiFi Kantor ($currentSsid)');
+      } else {
+        // Tidak cocok/gagal deteksi. Tampilkan dialog kegagalan & pilihan simulasi
+        _showWiFiFailureDialog(
+          pegawaiId: pegawaiId,
+          detectedSsid: currentSsid,
+          officeSsids: officeSsids,
+        );
+      }
+    } catch (e) {
+      if (dialogContext != null) {
+        Navigator.pop(dialogContext!); // Tutup loading dialog secara aman menggunakan dialogContext
+      }
+      _showWiFiFailureDialog(
+        pegawaiId: pegawaiId,
+        detectedSsid: null,
+        officeSsids: [],
+        errorMsg: 'Terjadi kegagalan sistem deteksi WiFi: $e',
+      );
+    }
+  }
+
+  /// Eksekusi pengiriman data check-in WFO ke database dan tampilkan SuccessDialog.
+  Future<void> _performWfoCheckIn(String pegawaiId, {required String method}) async {
+    BuildContext? dialogContext;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        dialogContext = ctx;
+        return const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        );
+      },
+    );
+
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    try {
+      await _attendanceService.checkIn(
+        pegawaiId: pegawaiId,
+        skemaKerja: 'WFO',
+        jadwalId: todayJadwalId,
+        statusKehadiran: 'Hadir',
+        catatan: 'Check-in via $method',
+      );
+
+      if (dialogContext != null) {
+        Navigator.pop(dialogContext!); // Tutup loading dialog secara aman menggunakan dialogContext
+      }
+
+      await _loadTodayData();
+      ActivityService.instance.recordCheckIn();
+
+      // Tampilkan SuccessDialog dengan format desain dari figma/mockup
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => SuccessDialog(
+            title: 'Check In Berhasil!',
+            description: 'Anda berhasil melakukan check in via $method.',
+            onClose: () => Navigator.pop(context),
+          ),
+        );
+      }
+    } catch (e) {
+      if (dialogContext != null) {
+        Navigator.pop(dialogContext!); // Tutup loading dialog secara aman menggunakan dialogContext
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal mencatat Check In: $e'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Menampilkan dialog jika verifikasi WiFi kantor tidak cocok.
+  void _showWiFiFailureDialog({
+    required String pegawaiId,
+    required String? detectedSsid,
+    required List<String> officeSsids,
+    String? errorMsg,
+  }) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.wifi_off_rounded, color: Colors.amber, size: 28),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'WiFi Kantor Tidak Sesuai',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              errorMsg ?? 'SSID WiFi perangkat Anda saat ini tidak terdaftar sebagai WiFi kantor resmi.',
+              style: TextStyle(fontSize: 13, color: Colors.grey[600], height: 1.3),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'WiFi Terdeteksi:',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[500]),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    detectedSsid != null ? '"$detectedSsid"' : '(Tidak Terdeteksi/Butuh Izin)',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'WiFi Kantor Terdaftar:',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[500]),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    officeSsids.isNotEmpty ? officeSsids.join('\n') : '-',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Batal',
+              style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _performWfoCheckIn(pegawaiId, method: 'Simulasi WiFi Kantor');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEFF6FF),
+              foregroundColor: const Color(0xFF2563EB),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text(
+              'Simulasi WiFi',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
 
@@ -1115,3 +1364,148 @@ class AttendanceIllustration extends StatelessWidget {
     );
   }
 }
+
+class CheckInMethodSelectionSheet extends StatelessWidget {
+  final VoidCallback onNfcSelected;
+  final VoidCallback onWiFiSelected;
+
+  const CheckInMethodSelectionSheet({
+    super.key,
+    required this.onNfcSelected,
+    required this.onWiFiSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Handle Indicator
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          // Title
+          const Text(
+            'Pilih Metode Check In WFO',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Silakan pilih salah satu metode absensi kehadiran Anda di area kantor.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[600],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Option 1: Tap NFC
+          _buildMethodCard(
+            icon: Icons.nfc_rounded,
+            iconColor: const Color(0xFF2563EB), // Blue
+            bgColor: const Color(0xFFEFF6FF),
+            title: 'Tap Kartu NFC',
+            description: 'Tempelkan kartu pegawai ke bagian belakang ponsel Anda.',
+            onTap: onNfcSelected,
+          ),
+          const SizedBox(height: 16),
+
+          // Option 2: WiFi Kantor
+          _buildMethodCard(
+            icon: Icons.wifi_rounded,
+            iconColor: const Color(0xFF059669), // Green
+            bgColor: const Color(0xFFECFDF5),
+            title: 'WiFi Kantor',
+            description: 'Verifikasi kehadiran otomatis dengan tersambung ke WiFi kantor.',
+            onTap: onWiFiSelected,
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMethodCard({
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required String title,
+    required String description,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey[200]!, width: 1.5),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: Colors.grey[400]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

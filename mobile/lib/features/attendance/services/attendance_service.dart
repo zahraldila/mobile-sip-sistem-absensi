@@ -66,6 +66,27 @@ class AttendanceService {
     return null;
   }
 
+  /// Mengambil semua wifi kantor yang aktif.
+  Future<List<Map<String, dynamic>>> fetchActiveOfficeWiFi() async {
+    try {
+      final options = await _buildOptions();
+      final response = await _dio.get(
+        '/rest/v1/wifi_kantor',
+        queryParameters: {
+          'aktif': 'eq.true',
+        },
+        options: options,
+      );
+      debugPrint('[AttendanceService] fetchActiveOfficeWiFi status: ${response.statusCode}, data: ${response.data}');
+      if (response.statusCode == 200 && response.data is List) {
+        return List<Map<String, dynamic>>.from(response.data as List);
+      }
+    } catch (e) {
+      debugPrint('[AttendanceService] Error fetching office WiFi: $e');
+    }
+    return [];
+  }
+
   /// Mengambil data absensi hari ini milik pegawai.
   Future<Map<String, dynamic>?> fetchTodayAttendance(String pegawaiId) async {
     try {
