@@ -181,27 +181,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       }
     } else {
       if (currentMode == AttendanceMode.wfo) {
-        // Untuk WFO: Tampilkan Bottom Sheet Pilihan Metode Check In
-        showModalBottomSheet(
-          context: context,
-          useRootNavigator: true,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          clipBehavior: Clip.antiAlias,
-          builder: (context) => CheckInMethodSelectionSheet(
-            onNfcSelected: () {
-              Navigator.pop(context); // Tutup Bottom Sheet
-              _triggerNfcCheckIn(pegawaiId);
-            },
-            onWiFiSelected: () {
-              Navigator.pop(context); // Tutup Bottom Sheet
-              _triggerWiFiCheckIn(pegawaiId);
-            },
-          ),
-        );
+        await _attemptWfoCheckIn(pegawaiId);
       } else {
         // Untuk WFH / WFC (setelah disetujui): buka halaman proses selfie & GPS
         final result = await context.push<bool>('/attendance/check-in', extra: currentMode);
@@ -209,6 +189,13 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
           await _loadTodayData();
         }
       }
+    }
+  }
+
+  Future<void> _attemptWfoCheckIn(String pegawaiId) async {
+    final isWiFiValid = await _triggerWiFiCheckIn(pegawaiId);
+    if (!isWiFiValid) {
+      _triggerNfcCheckIn(pegawaiId);
     }
   }
 
@@ -457,7 +444,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
   }
 
   /// Menjalankan verifikasi WiFi untuk Check In WFO.
-  Future<void> _triggerWiFiCheckIn(String pegawaiId) async {
+  Future<bool> _triggerWiFiCheckIn(String pegawaiId) async {
     BuildContext? dialogContext;
     showDialog(
       context: context,
@@ -510,7 +497,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
           officeSsids: [],
           errorMsg: 'Tidak ada WiFi Kantor aktif yang terdaftar di database.',
         );
-        return;
+        return false;
       }
 
       // Ambil seluruh nama SSID kantor yang aktif
@@ -529,13 +516,15 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       if (isMatched) {
         // Cocok! Jalankan Check In langsung
         await _performWfoCheckIn(pegawaiId, method: 'WiFi Kantor ($currentSsid)');
+        return true;
       } else {
-        // Tidak cocok/gagal deteksi. Tampilkan dialog kegagalan & pilihan simulasi
+        // Tidak cocok/gagal deteksi.
         _showWiFiFailureDialog(
           pegawaiId: pegawaiId,
           detectedSsid: currentSsid,
           officeSsids: officeSsids,
         );
+        return false;
       }
     } catch (e) {
       if (dialogContext != null) {
@@ -547,6 +536,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         officeSsids: [],
         errorMsg: 'Terjadi kegagalan sistem deteksi WiFi: $e',
       );
+      return false;
     }
   }
 
@@ -687,26 +677,6 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
             child: Text(
               'Batal',
               style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              if (isCheckOut) {
-                _performWfoCheckOut(pegawaiId, method: 'Simulasi WiFi Kantor', reason: reason);
-              } else {
-                _performWfoCheckIn(pegawaiId, method: 'Simulasi WiFi Kantor');
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEFF6FF),
-              foregroundColor: const Color(0xFF2563EB),
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text(
-              'Simulasi WiFi',
-              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -2183,4 +2153,4 @@ class _EarlyCheckOutSheetState extends State<EarlyCheckOutSheet> {
       ),
     );
   }
-}
+}

@@ -109,19 +109,21 @@ class _CheckInWfhPageState extends State<CheckInWfhPage> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.md,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: AppSpacing.sm),
-          _TimeCard(time: _currentTime, date: _currentDate),
-          const SizedBox(height: AppSpacing.md),
           _InfoBanner(
             icon: Icons.home_outlined,
             title: 'Work From Home',
             subtitle:
                 'Absensi dilakukan dengan verifikasi lokasi GPS dan foto selfie dari rumah.',
-            color: const Color(0xFF7C3AED),
+            color: AppColors.primary,
           ),
           const SizedBox(height: AppSpacing.md),
 
@@ -140,7 +142,7 @@ class _CheckInWfhPageState extends State<CheckInWfhPage> {
             actionLabel: 'Deteksi Lokasi',
             successText: _locationText,
             loadingText: 'Mengambil koordinat GPS...',
-            accentColor: const Color(0xFF7C3AED),
+            accentColor: AppColors.primary,
           ),
           const SizedBox(height: AppSpacing.md),
 
@@ -159,7 +161,7 @@ class _CheckInWfhPageState extends State<CheckInWfhPage> {
             actionLabel: 'Ambil Foto Selfie',
             successText: 'Foto selfie berhasil diambil',
             loadingText: 'Memproses foto...',
-            accentColor: const Color(0xFF7C3AED),
+            accentColor: AppColors.primary,
             previewWidget: _selfieStatus == _DetectionStatus.success
                 ? _SelfiePreview()
                 : null,
@@ -180,12 +182,12 @@ class _CheckInWfhPageState extends State<CheckInWfhPage> {
                       ?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7C3AED),
-                  disabledBackgroundColor: const Color(0xFF7C3AED),
+                  backgroundColor: AppColors.primary,
+                  disabledBackgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(
                       borderRadius: AppRadius.pill),
                   elevation: _canSubmit ? 4 : 0,
-                  shadowColor: const Color(0xFF7C3AED).withAlpha(100),
+                  shadowColor: AppColors.primary.withAlpha(100),
                 ),
               ),
             ),
@@ -263,14 +265,14 @@ class _TimeCard extends StatelessWidget {
           horizontal: AppSpacing.xl, vertical: AppSpacing.lg),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF6D28D9), Color(0xFF7C3AED), Color(0xFF8B5CF6)],
+          colors: [AppColors.primary, AppColors.secondary, AppColors.secondary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: AppRadius.large,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF7C3AED).withAlpha(80),
+            color: AppColors.primary.withAlpha(80),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
