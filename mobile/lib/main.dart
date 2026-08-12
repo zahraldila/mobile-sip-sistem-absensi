@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:sip_sistem_absensi_mobile/app_router.dart';
+import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_theme.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await supabase.Supabase.initialize(
+    url: SupabaseConfig.url,
+    publishableKey: SupabaseConfig.anonKey,
+  );
   await initializeDateFormatting('id', null);
   await AuthState.instance.initialize();
   runApp(const SipSistemAbsensiApp());

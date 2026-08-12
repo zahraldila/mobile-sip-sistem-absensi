@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
+
 import '../data/auth_service.dart';
 import '../domain/entities/auth_user.dart';
 import 'auth_session_service.dart';
@@ -22,6 +24,13 @@ class AuthState extends ChangeNotifier {
   Future<void> initialize() async {
     _currentUser = await _sessionService.restoreSession();
     _initialized = true;
+    if (_currentUser != null) {
+      try {
+        await supabase.Supabase.instance.client.auth.getSession();
+      } catch (_) {
+        // Ignore refresh failures; app can still use restored token if available.
+      }
+    }
     notifyListeners();
   }
 

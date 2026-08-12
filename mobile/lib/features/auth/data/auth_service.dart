@@ -2,6 +2,7 @@ import 'package:bcrypt/bcrypt.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../domain/entities/auth_user.dart';
 import '../services/auth_session_service.dart';
 
@@ -33,7 +34,17 @@ class AuthService {
       'Accept': 'application/json',
     };
 
-    final token = await AuthSessionService().restoreToken();
+    String? sessionToken;
+    try {
+      final session = await supabase.Supabase.instance.client.auth.getSession();
+      sessionToken = session?.accessToken;
+    } catch (_) {
+      sessionToken = supabase.Supabase.instance.client.auth.currentSession?.accessToken;
+    }
+
+    final token = sessionToken != null && sessionToken.isNotEmpty
+        ? sessionToken
+        : await AuthSessionService().restoreToken();
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
@@ -181,6 +192,34 @@ class AuthService {
         pegawaiData = await getPegawaiDetail(pegawaiId);
       }
 
+      final emailForSupabase = _resolveSupabaseAuthEmail(
+        normalizedIdentifier: normalizedIdentifier,
+        rawAccount: rawAccount,
+        pegawaiData: pegawaiData,
+      );
+
+      String accessToken = '';
+      if (emailForSupabase != null && emailForSupabase.isNotEmpty) {
+        try {
+          final authResponse = await supabase.Supabase.instance.client.auth.signInWithPassword(
+            email: emailForSupabase,
+            password: normalizedPassword,
+          );
+
+          final session = authResponse.session;
+          if (session != null && session.accessToken.isNotEmpty) {
+            accessToken = session.accessToken;
+          } else {
+            debugPrint('Supabase login succeeded without a session token. Continuing with custom auth.');
+          }
+        } catch (e) {
+          debugPrint('Supabase login error: $e');
+          debugPrint('Custom auth succeeded; skipping Supabase session because the account may not exist in Supabase Auth.');
+        }
+      } else {
+        debugPrint('No Supabase auth email resolved. Continuing with custom auth only.');
+      }
+
       _loggedIn = true;
       return AuthUser(
         akunId: akunId,
@@ -196,7 +235,7 @@ class AuthService {
         fotoProfile: pegawaiData?['foto_profile']?.toString() ??
             pegawaiData?['fotoProfile']?.toString() ??
             '',
-        accessToken: '',
+        accessToken: accessToken,
       );
     } on DioException catch (e) {
       debugPrint('ERROR');
@@ -302,6 +341,28 @@ class AuthService {
       debugPrint(e.toString());
       return false;
     }
+  }
+
+  String? _resolveSupabaseAuthEmail({
+    required String normalizedIdentifier,
+    required Map<String, dynamic> rawAccount,
+    Map<String, dynamic>? pegawaiData,
+  }) {
+    if (normalizedIdentifier.contains('@')) {
+      return normalizedIdentifier;
+    }
+
+    final pegawaiEmail = pegawaiData?['email']?.toString();
+    if (pegawaiEmail != null && pegawaiEmail.isNotEmpty) {
+      return pegawaiEmail;
+    }
+
+    final rawEmail = rawAccount['email']?.toString();
+    if (rawEmail != null && rawEmail.isNotEmpty) {
+      return rawEmail;
+    }
+
+    return null;
   }
 
   bool _verifyPassword(String inputPassword, String storedPassword) {

@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
-import 'package:sip_sistem_absensi_mobile/core/theme/app_radius.dart';
-import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
 import 'package:sip_sistem_absensi_mobile/core/widgets/status_badge.dart';
 import 'package:sip_sistem_absensi_mobile/features/submission/domain/entities/pengajuan.dart';
 import 'package:sip_sistem_absensi_mobile/shared/widgets/cards/primary_card.dart';
+import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+String _displayFileName(String filePath) {
+  final normalized = filePath.replaceAll('submission-files/', '').replaceAll(RegExp(r'^storage/'), '');
+  final fileName = normalized.split('/').last;
+  return fileName.replaceFirst(RegExp(r'^[0-9]{13}_'), '');
+}
 
 class PengajuanDetailSheet extends StatelessWidget {
   const PengajuanDetailSheet({super.key, required this.pengajuan});
@@ -261,7 +267,7 @@ class _AttachmentCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(fileName, style: AppTypography.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
+                  Text(_displayFileName(fileName), style: AppTypography.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
                   Text('File lampiran', style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
                 ],
@@ -269,8 +275,35 @@ class _AttachmentCard extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             TextButton(
-              onPressed: () {
-                // action placeholder: implement if a file viewer/download exists
+              onPressed: () async {
+                final publicUrl = '${SupabaseConfig.url}/storage/v1/object/public/$fileName';
+                try {
+                  final uri = Uri.parse(publicUrl);
+                  final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  if (!launched) {
+                    showDialog<void>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Gagal'),
+                        content: const Text('Gagal membuka lampiran.'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Tutup')),
+                        ],
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  showDialog<void>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Gagal'),
+                      content: Text('Gagal mengakses lampiran. ${e.toString()}'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Tutup')),
+                      ],
+                    ),
+                  );
+                }
               },
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.primary,

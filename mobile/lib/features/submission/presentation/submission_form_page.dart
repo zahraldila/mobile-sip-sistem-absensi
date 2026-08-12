@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as path;
 import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
@@ -28,6 +31,7 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
   String? _selectedJenis;
   final List<DateTime> _tanggalList = [DateTime.now()];
   String? _selectedFileName;
+  XFile? _selectedFile;
   bool _isSubmitting = false;
 
   late final CreatePengajuan _createPengajuan;
@@ -97,7 +101,29 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
     final result = await openFile(acceptedTypeGroups: [typeGroup]);
     if (result == null) return;
 
+    // Validation: extension
+    final allowedExt = ['pdf', 'jpg', 'jpeg', 'png'];
+    final name = result.name;
+    final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+    if (!allowedExt.contains(ext)) {
+      _showError('Format file yang diperbolehkan: PDF, JPG, JPEG, dan PNG.');
+      return;
+    }
+
+    // Validation: size (<= 20 MB)
+    try {
+      final size = await result.length();
+      const maxBytes = 20 * 1024 * 1024; // 20 MB
+      if (size > maxBytes) {
+        _showError('Ukuran file maksimal 20 MB.');
+        return;
+      }
+    } catch (e) {
+      // If size cannot be determined, proceed cautiously
+    }
+
     setState(() {
+      _selectedFile = result;
       _selectedFileName = result.name;
     });
   }
@@ -115,15 +141,39 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
       _isSubmitting = true;
     });
 
-    final request = PengajuanRequest(
-      pegawaiId: user.pegawaiId,
-      jenisPengajuan: _selectedJenis ?? '',
-      tanggalPengajuan: List.unmodifiable(_tanggalList),
-      lampiran: _selectedFileName,
-      keterangan: _keteranganController.text.isEmpty ? null : _keteranganController.text.trim(),
-    );
+    String? uploadedPath;
 
     try {
+      if (_selectedFile != null) {
+        try {
+          // Prepare file object
+          File fileToUpload;
+          if (_selectedFile!.path != null && _selectedFile!.path.isNotEmpty) {
+            fileToUpload = File(_selectedFile!.path);
+          } else {
+            // Write bytes to temp file
+            final bytes = await _selectedFile!.readAsBytes();
+            final tmp = File('${Directory.systemTemp.path}/${DateTime.now().millisecondsSinceEpoch}_${_selectedFile!.name}');
+            await tmp.writeAsBytes(bytes);
+            fileToUpload = tmp;
+          }
+
+          final remote = PengajuanRemoteDataSource();
+          uploadedPath = await remote.uploadLampiran(pegawaiId: user.pegawaiId, file: fileToUpload);
+        } catch (e) {
+          _showError('Gagal mengunggah lampiran. ${e.toString()}');
+          return;
+        }
+      }
+
+      final request = PengajuanRequest(
+        pegawaiId: user.pegawaiId,
+        jenisPengajuan: _selectedJenis ?? '',
+        tanggalPengajuan: List.unmodifiable(_tanggalList),
+        lampiran: uploadedPath ?? _selectedFileName,
+        keterangan: _keteranganController.text.isEmpty ? null : _keteranganController.text.trim(),
+      );
+
       await _createPengajuan(request);
       await _showSuccess();
       if (mounted) Navigator.pop(context, true);
