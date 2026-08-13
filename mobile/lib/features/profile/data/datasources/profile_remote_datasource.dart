@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path/path.dart' as path;
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
+import 'package:sip_sistem_absensi_mobile/core/services/audit_log_service.dart';
+import 'package:sip_sistem_absensi_mobile/features/attendance/services/activity_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 
 class ProfileRemoteDataSource {
@@ -164,6 +166,11 @@ class ProfileRemoteDataSource {
             ((response.data is List && (response.data as List).isNotEmpty) ||
                 response.statusCode == 204)) {
           print('====== UPDATE DATABASE BERHASIL KOLOM: $column ======');
+          // Catat ke audit_log
+          final aktivitas = await AuditLogService.instance.log('Update foto profil');
+          if (aktivitas != null) {
+            ActivityService.instance.recordAuditActivity(aktivitas);
+          }
           return true;
         }
       } on DioException catch (e) {

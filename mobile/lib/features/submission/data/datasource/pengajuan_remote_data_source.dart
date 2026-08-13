@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path/path.dart' as path;
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
+import 'package:sip_sistem_absensi_mobile/core/services/audit_log_service.dart';
+import 'package:sip_sistem_absensi_mobile/features/attendance/services/activity_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 import '../../domain/entities/pengajuan_request.dart';
 import '../models/pengajuan_model.dart';
@@ -90,6 +92,11 @@ class PengajuanRemoteDataSource {
         }));
 
     if (resp.statusCode == 201 || resp.statusCode == 204) {
+      // Catat ke audit_log
+      final aktivitas = await AuditLogService.instance.log('Membuat pengajuan ${request.jenisPengajuan}');
+      if (aktivitas != null) {
+        ActivityService.instance.recordAuditActivity(aktivitas);
+      }
       return;
     }
 

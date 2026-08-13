@@ -36,13 +36,14 @@ class ActivityItemData {
 
   factory ActivityItemData.checkIn({
     required String timeText,
+    String subtitle = 'Anda berhasil melakukan check in',
     String? id,
     DateTime? createdAt,
   }) {
     return ActivityItemData(
       id: id ?? 'checkin_${DateTime.now().millisecondsSinceEpoch}',
       title: 'Check In Berhasil',
-      subtitle: 'Anda berhasil melakukan check in',
+      subtitle: subtitle,
       timeText: timeText,
       statusLabel: 'Berhasil',
       statusColor: const Color(0xFF27AE60),
@@ -57,13 +58,14 @@ class ActivityItemData {
 
   factory ActivityItemData.checkOut({
     required String timeText,
+    String subtitle = 'Anda berhasil melakukan check out',
     String? id,
     DateTime? createdAt,
   }) {
     return ActivityItemData(
       id: id ?? 'checkout_${DateTime.now().millisecondsSinceEpoch}',
       title: 'Check Out Berhasil',
-      subtitle: 'Anda berhasil melakukan check out',
+      subtitle: subtitle,
       timeText: timeText,
       statusLabel: 'Berhasil',
       statusColor: const Color(0xFFEB5757),
@@ -127,39 +129,29 @@ class ActivityItemData {
 
 /// Singleton Service pengelola aktivitas real-time
 class ActivityService extends ChangeNotifier {
-  ActivityService._() {
-    _initDefaultActivities();
-  }
+  ActivityService._();
 
   static final ActivityService instance = ActivityService._();
 
   final List<ActivityItemData> _activities = [];
+  String? _loadedAkunId;
 
   List<ActivityItemData> get activities => List.unmodifiable(_activities);
 
-  void _initDefaultActivities() {
-    // Keep mock data as initial state before DB sync completes
-    _activities.addAll([
-      ActivityItemData.checkIn(
-        timeText: 'Hari Ini, 08:25 WIB',
-        createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-      ),
-      ActivityItemData.pengajuan(
-        title: 'Pengajuan WFH',
-        subtitle: 'Pengajuan work from home',
-        timeText: 'Kemarin, 08.00 WIB',
-        createdAt: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
-      ),
-      ActivityItemData.checkOut(
-        timeText: 'Kemarin, 15.30 WIB',
-        createdAt: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-    ]);
-  }
-
   /// Memuat aktivitas absensi dan pengajuan nyata dari database
-  Future<void> loadActivitiesFromDatabase(String pegawaiId) async {
-    if (pegawaiId.isEmpty) return;
+  Future<void> loadActivitiesFromDatabase() async {
+    final currentUser = AuthState.instance.currentUser;
+    final akunId = currentUser?.akunId ?? '';
+    if (akunId.isEmpty) {
+      _loadedAkunId = null;
+      _activities.clear();
+      notifyListeners();
+      return;
+    }
+
+    if (_loadedAkunId != akunId) {
+      _activities.clear();
+    }
 
     try {
       final token = AuthState.instance.currentUser?.accessToken;
@@ -172,93 +164,159 @@ class ActivityService extends ChangeNotifier {
 
       final dio = Dio(BaseOptions(baseUrl: SupabaseConfig.url, headers: headers));
 
-      // 1. Ambil data absensi terbaru
-      final absensiResponse = await dio.get(
-        '/rest/v1/absensi',
+      final response = await dio.get(
+        '/rest/v1/audit_log',
         queryParameters: {
-          'pegawai_id': 'eq.$pegawaiId',
-          'order': 'tanggal_absensi.desc,jam_checkin.desc',
-          'limit': '5',
-        },
-      );
-
-      // 2. Ambil data pengajuan terbaru
-      final pengajuanResponse = await dio.get(
-        '/rest/v1/pengajuan',
-        queryParameters: {
-          'pegawai_id': 'eq.$pegawaiId',
-          'order': 'tanggal_pengajuan.desc',
-          'limit': '5',
+          'akun_id': 'eq.$akunId',
+          'select': 'log_id,aktivitas,waktu_log',
+          'order': 'waktu_log.desc',
         },
       );
 
       final List<ActivityItemData> newActivities = [];
 
-      // Parse absensi
-      if (absensiResponse.statusCode == 200 && absensiResponse.data is List) {
-        final list = absensiResponse.data as List;
+      if (response.statusCode == 200 && response.data is List) {
+        final list = response.data as List;
         for (final item in list) {
           final map = item as Map<String, dynamic>;
+          final aktivitas = map['aktivitas']?.toString().trim() ?? '';
+          final waktuLog = DateTime.tryParse(map['waktu_log']?.toString() ?? '')?.toLocal();
 
-          // Check In
-          final checkInStr = map['jam_checkin']?.toString();
-          if (checkInStr != null && checkInStr.isNotEmpty) {
-            final checkInTime = DateTime.tryParse(checkInStr)?.toLocal();
-            if (checkInTime != null) {
-              newActivities.add(ActivityItemData.checkIn(
-                id: 'checkin_${map['absensi_id'] ?? checkInStr}',
-                timeText: _formatActivityTime(checkInTime),
-                createdAt: checkInTime,
-              ));
-            }
+          if (aktivitas.isEmpty || waktuLog == null) {
+            continue;
           }
 
-          // Check Out
-          final checkOutStr = map['jam_checkout']?.toString();
-          if (checkOutStr != null && checkOutStr.isNotEmpty) {
-            final checkOutTime = DateTime.tryParse(checkOutStr)?.toLocal();
-            if (checkOutTime != null) {
-              newActivities.add(ActivityItemData.checkOut(
-                id: 'checkout_${map['absensi_id'] ?? checkOutStr}',
-                timeText: _formatActivityTime(checkOutTime),
-                createdAt: checkOutTime,
-              ));
-            }
-          }
-        }
-      }
-
-      // Parse pengajuan
-      if (pengajuanResponse.statusCode == 200 && pengajuanResponse.data is List) {
-        final list = pengajuanResponse.data as List;
-        for (final item in list) {
-          final map = item as Map<String, dynamic>;
-          final dateStr = map['tanggal_pengajuan']?.toString() ?? '';
-          final jenis = map['jenis_pengajuan']?.toString() ?? 'Pengajuan';
-          final status = map['status_pengajuan']?.toString() ?? 'Pending';
-          final id = map['pengajuan_id']?.toString() ?? dateStr;
-
-          final date = DateTime.tryParse(dateStr)?.toLocal() ?? DateTime.now();
-          newActivities.add(ActivityItemData.pengajuan(
-            id: 'pengajuan_$id',
-            title: 'Pengajuan $jenis',
-            subtitle: 'Pengajuan $jenis Anda sedang berstatus $status',
-            timeText: _formatActivityDateOnly(date),
-            status: status,
-            createdAt: date,
-          ));
+          newActivities.add(
+            _activityFromAuditLog(
+              id: map['log_id']?.toString() ?? 'audit_${waktuLog.millisecondsSinceEpoch}',
+              aktivitas: aktivitas,
+              createdAt: waktuLog,
+            ),
+          );
         }
       }
 
       // Urutkan berdasarkan waktu terbaru
       newActivities.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
+      if (newActivities.isEmpty) {
+        _loadedAkunId = akunId;
+        notifyListeners();
+        return;
+      }
+
       _activities.clear();
       _activities.addAll(newActivities);
+      _loadedAkunId = akunId;
       notifyListeners();
     } catch (e) {
       debugPrint('[ActivityService] Error loading activities from DB: $e');
     }
+  }
+
+  void recordAuditActivity(
+    String aktivitas, {
+    DateTime? timestamp,
+  }) {
+    final now = timestamp ?? DateTime.now();
+    final item = _activityFromAuditLog(
+      id: 'local_${now.millisecondsSinceEpoch}',
+      aktivitas: aktivitas,
+      createdAt: now,
+    );
+    _activities.insert(0, item);
+    notifyListeners();
+  }
+
+  ActivityItemData _activityFromAuditLog({
+    required String id,
+    required String aktivitas,
+    required DateTime createdAt,
+  }) {
+    final normalized = aktivitas.toLowerCase();
+    final timeText = _formatActivityTime(createdAt);
+
+    if (normalized.contains('login')) {
+      return ActivityItemData.info(
+        id: id,
+        title: aktivitas,
+        subtitle: 'Log aktivitas akun Anda',
+        timeText: timeText,
+        status: 'Berhasil',
+        createdAt: createdAt,
+      );
+    }
+
+    if (normalized.contains('logout')) {
+      return ActivityItemData.info(
+        id: id,
+        title: aktivitas,
+        subtitle: 'Log aktivitas akun Anda',
+        timeText: timeText,
+        status: 'Berhasil',
+        createdAt: createdAt,
+      );
+    }
+
+    if (normalized.contains('check out')) {
+      return ActivityItemData.checkOut(
+        id: id,
+        subtitle: aktivitas,
+        timeText: timeText,
+        createdAt: createdAt,
+      );
+    }
+
+    if (normalized.contains('check in')) {
+      return ActivityItemData.checkIn(
+        id: id,
+        subtitle: aktivitas,
+        timeText: timeText,
+        createdAt: createdAt,
+      );
+    }
+
+    if (normalized.contains('foto profil')) {
+      return ActivityItemData.info(
+        id: id,
+        title: aktivitas,
+        subtitle: 'Log aktivitas akun Anda',
+        timeText: timeText,
+        status: 'Diperbarui',
+        createdAt: createdAt,
+      );
+    }
+
+    if (normalized.contains('update data profil') || normalized.contains('profil')) {
+      return ActivityItemData.info(
+        id: id,
+        title: aktivitas,
+        subtitle: 'Log aktivitas akun Anda',
+        timeText: timeText,
+        status: 'Diperbarui',
+        createdAt: createdAt,
+      );
+    }
+
+    if (normalized.contains('pengajuan')) {
+      return ActivityItemData.info(
+        id: id,
+        title: aktivitas,
+        subtitle: 'Log aktivitas akun Anda',
+        timeText: timeText,
+        status: 'Tercatat',
+        createdAt: createdAt,
+      );
+    }
+
+    return ActivityItemData.info(
+      id: id,
+      title: aktivitas,
+      subtitle: 'Log aktivitas akun Anda',
+      timeText: timeText,
+      status: 'Info',
+      createdAt: createdAt,
+    );
   }
 
   String _formatActivityTime(DateTime dt) {
@@ -275,21 +333,6 @@ class ActivityService extends ChangeNotifier {
       return 'Kemarin, $timeStr WIB';
     } else {
       return '${DateFormat('dd MMM').format(dt)}, $timeStr WIB';
-    }
-  }
-
-  String _formatActivityDateOnly(DateTime dt) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-    final dtDay = DateTime(dt.year, dt.month, dt.day);
-
-    if (dtDay == today) {
-      return 'Hari Ini';
-    } else if (dtDay == yesterday) {
-      return 'Kemarin';
-    } else {
-      return DateFormat('dd MMM yyyy').format(dt);
     }
   }
 

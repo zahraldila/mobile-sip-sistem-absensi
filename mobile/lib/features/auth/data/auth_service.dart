@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:bcrypt/bcrypt.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
+import 'package:sip_sistem_absensi_mobile/core/services/audit_log_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../domain/entities/auth_user.dart';
 import '../services/auth_session_service.dart';
@@ -221,7 +223,7 @@ class AuthService {
       }
 
       _loggedIn = true;
-      return AuthUser(
+      final authUser = AuthUser(
         akunId: akunId,
         pegawaiId: pegawaiId,
         username: username,
@@ -237,6 +239,14 @@ class AuthService {
             '',
         accessToken: accessToken,
       );
+
+      // Catat ke audit_log — akun_id diambil dari data yang baru di-resolve.
+      // AuditLogService membaca dari AuthState, namun saat ini AuthState belum
+      // di-set, jadi kita POST langsung menggunakan akunId yang sudah diketahui.
+      final namaForLog = authUser.namaPegawai.isNotEmpty ? authUser.namaPegawai : authUser.username;
+      await _logAuditLogin(akunId: akunId, nama: namaForLog, token: accessToken);
+
+      return authUser;
     } on DioException catch (e) {
       debugPrint('ERROR');
       debugPrint('${e.response?.statusCode}');
@@ -331,15 +341,61 @@ class AuthService {
         return false;
       }
 
+      bool success;
       if (response.data is List) {
-        return (response.data as List).isNotEmpty;
+        success = (response.data as List).isNotEmpty;
+      } else {
+        success = response.statusCode == 204 || response.data != null;
       }
 
-      return response.statusCode == 204 || response.data != null;
+      if (success) {
+        // Catat ke audit_log
+        AuditLogService.instance.log('update data profil');
+      }
+
+      return success;
     } catch (e) {
       debugPrint('ERROR UPDATE');
       debugPrint(e.toString());
       return false;
+    }
+  }
+
+  /// Mencatat aksi login ke tabel [audit_log].
+  /// Dipanggil secara terpisah saat login karena [AuthState] belum di-set
+  /// pada saat metode [login] selesai dieksekusi.
+  Future<void> _logAuditLogin({
+    required String akunId,
+    required String nama,
+    required String token,
+  }) async {
+    try {
+      if (akunId.isEmpty) return;
+
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: SupabaseConfig.url,
+          headers: {
+            'apikey': SupabaseConfig.anonKey,
+            'Authorization': 'Bearer ${token.isNotEmpty ? token : SupabaseConfig.anonKey}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+        ),
+      );
+
+      await dio.post(
+        '/rest/v1/audit_log',
+        data: {
+          'akun_id': akunId,
+          'aktivitas': '$nama berhasil melakukan Login',
+          'waktu_log': DateTime.now().toIso8601String(),
+        },
+      );
+      debugPrint('[AuditLogService] Dicatat: "$nama berhasil melakukan Login" (akun_id=$akunId)');
+    } catch (e) {
+      debugPrint('[AuditLogService] Gagal catat login: $e');
     }
   }
 

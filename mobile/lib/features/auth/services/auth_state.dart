@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../data/auth_service.dart';
 import '../domain/entities/auth_user.dart';
 import 'auth_session_service.dart';
+import 'package:sip_sistem_absensi_mobile/core/services/audit_log_service.dart';
+import 'package:sip_sistem_absensi_mobile/features/attendance/services/activity_service.dart';
 
 class AuthState extends ChangeNotifier {
   AuthState._();
@@ -55,11 +57,19 @@ class AuthState extends ChangeNotifier {
     } else {
       await _sessionService.persistToken(user.accessToken);
     }
+
+    final namaPegawai = user.namaPegawai.isNotEmpty ? user.namaPegawai : user.username;
+    ActivityService.instance.recordAuditActivity('$namaPegawai melakukan Login');
     notifyListeners();
     return true;
   }
 
   Future<void> logout() async {
+    // Catat ke audit_log sebelum _currentUser di-clear
+    final aktivitas = await AuditLogService.instance.log('Logout');
+    if (aktivitas != null) {
+      ActivityService.instance.recordAuditActivity(aktivitas);
+    }
     _currentUser = null;
     await _sessionService.clearSession();
     notifyListeners();

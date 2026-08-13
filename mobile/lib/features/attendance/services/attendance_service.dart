@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
+import 'package:sip_sistem_absensi_mobile/core/services/audit_log_service.dart';
+import 'package:sip_sistem_absensi_mobile/features/attendance/services/activity_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 
 class AttendanceService {
@@ -184,6 +186,12 @@ class AttendanceService {
       if (response.statusCode != 201 && response.statusCode != 204) {
         throw Exception('Server returned ${response.statusCode}');
       }
+
+      // Catat ke audit_log
+      final aktivitas = await AuditLogService.instance.log('Check In');
+      if (aktivitas != null) {
+        ActivityService.instance.recordAuditActivity(aktivitas);
+      }
     } catch (e) {
       debugPrint('[AttendanceService] Error during checkIn: $e');
       rethrow;
@@ -218,6 +226,12 @@ class AttendanceService {
 
       if (response.statusCode != 200 && response.statusCode != 204) {
         throw Exception('Server returned ${response.statusCode}');
+      }
+
+      // Catat ke audit_log
+      final aktivitas = await AuditLogService.instance.log('Check Out');
+      if (aktivitas != null) {
+        ActivityService.instance.recordAuditActivity(aktivitas);
       }
     } catch (e) {
       debugPrint('[AttendanceService] Error during checkOut: $e');

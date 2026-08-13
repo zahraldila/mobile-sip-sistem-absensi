@@ -84,7 +84,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
     }
 
     // Ambil data aktivitas terbaru secara riil dari database
-    await ActivityService.instance.loadActivitiesFromDatabase(pegawaiId);
+    await ActivityService.instance.loadActivitiesFromDatabase();
 
     // 1. Ambil Jadwal Kerja Aktif Hari Ini
     final schedule = await _attendanceService.fetchTodaySchedule();
