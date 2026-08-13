@@ -46,6 +46,7 @@ class _ProfilePageState extends State<ProfilePage> {
     setState(() {
       _pegawaiData = {
         'nama_pegawai': currentUser.namaPegawai,
+        'username': currentUser.username,
         'jabatan': currentUser.jabatan,
         'divisi': currentUser.divisi,
         'foto_profile': currentUser.fotoProfile,
@@ -354,6 +355,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
     final namaPegawai =
         _pegawaiData?['nama_pegawai']?.toString() ?? currentUser.namaPegawai;
+    final rawUsername =
+        _pegawaiData?['username']?.toString() ?? currentUser.username;
+    final username = rawUsername.isNotEmpty
+        ? (rawUsername.startsWith('@') ? rawUsername : '@$rawUsername')
+        : '';
     final jabatan = _pegawaiData?['jabatan']?.toString() ?? currentUser.jabatan;
     final divisi = _pegawaiData?['divisi']?.toString() ?? currentUser.divisi;
     final headerDivisi = divisi.isNotEmpty ? 'Divisi $divisi' : 'Divisi -';
@@ -468,6 +474,17 @@ Positioned(
                             color: Colors.black87,
                           ),
                         ),
+                        if (username.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            username,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 4),
                         Text(
                           jabatan,

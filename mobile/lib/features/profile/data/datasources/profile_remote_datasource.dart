@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
 import 'package:sip_sistem_absensi_mobile/core/services/audit_log_service.dart';
@@ -104,8 +105,8 @@ class ProfileRemoteDataSource {
     for (final bucket in _candidateBuckets) {
       try {
         final fullPath = '/storage/v1/object/$bucket/$objectPath';
-        print('====== MENCOBA UPLOAD KE BUCKET: $bucket ======');
-        print('Path: $fullPath');
+        debugPrint('====== MENCOBA UPLOAD KE BUCKET: $bucket ======');
+        debugPrint('Path: $fullPath');
         
         final uploadResponse = await _dio.post(
           fullPath,
@@ -118,11 +119,11 @@ class ProfileRemoteDataSource {
           ),
         );
 
-        print('Response status for $bucket: ${uploadResponse.statusCode}');
-        print('Response data for $bucket: ${uploadResponse.data}');
+        debugPrint('Response status for $bucket: ${uploadResponse.statusCode}');
+        debugPrint('Response data for $bucket: ${uploadResponse.data}');
 
         if (uploadResponse.statusCode == 200 || uploadResponse.statusCode == 201) {
-          print('====== UPLOAD BERHASIL KE BUCKET: $bucket ======');
+          debugPrint('====== UPLOAD BERHASIL KE BUCKET: $bucket ======');
           return '$bucket/$objectPath';
         } else {
           lastError = DioException(
@@ -132,7 +133,7 @@ class ProfileRemoteDataSource {
           );
         }
       } on DioException catch (e) {
-        print('DioException for $bucket: ${e.response?.statusCode} - ${e.response?.data ?? e.message}');
+        debugPrint('DioException for $bucket: ${e.response?.statusCode} - ${e.response?.data ?? e.message}');
         lastError = e;
       }
     }
@@ -142,13 +143,58 @@ class ProfileRemoteDataSource {
     );
   }
 
+  /// Upload selfie untuk attendance ke bucket `attendance-selfies`.
+  /// Mengembalikan path storage seperti: `attendance-selfies/{pegawaiId}/{date}/checkin_{timestamp}.jpg`
+  Future<String> uploadAttendanceSelfie({
+    required String pegawaiId,
+    required File imageFile,
+  }) async {
+    final fileBytes = await imageFile.readAsBytes();
+    final ext = path.extension(imageFile.path).toLowerCase();
+    final safeExt = ext.isNotEmpty ? ext : '.jpg';
+    final contentType = _contentTypeForExtension(safeExt);
+    final date = DateTime.now();
+    final dateStr = '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final timestamp = date.millisecondsSinceEpoch;
+    final objectPath = 'attendance-selfies/${pegawaiId}/${dateStr}/checkin_${timestamp}$safeExt';
+
+    final bucket = 'attendance-selfies';
+
+    try {
+      final fullPath = '/storage/v1/object/$bucket/${path.basename(objectPath)}';
+      // Note: Supabase storage API expects bucket in the path; we include folder structure in object name
+      final uploadResponse = await _dio.post(
+        '/storage/v1/object/$bucket/${pegawaiId}/${dateStr}/checkin_${timestamp}$safeExt',
+        data: fileBytes,
+        options: await _buildRequestOptions(
+          extraHeaders: {
+            'Content-Type': contentType,
+            'x-upsert': 'false',
+          },
+        ),
+      );
+
+      if (uploadResponse.statusCode == 200 || uploadResponse.statusCode == 201) {
+        return '$bucket/${pegawaiId}/${dateStr}/checkin_${timestamp}$safeExt';
+      }
+
+      throw DioException(
+        requestOptions: uploadResponse.requestOptions,
+        response: uploadResponse,
+        message: 'Status code: ${uploadResponse.statusCode}, body: ${uploadResponse.data}',
+      );
+    } on DioException catch (e) {
+      throw Exception('Upload attendance selfie gagal: ${e.response?.statusCode} ${e.response?.data ?? e.message}');
+    }
+  }
+
   Future<bool> updatePegawaiPhoto({
     required String pegawaiId,
     required String photoUrl,
   }) async {
     for (final column in _photoColumns) {
       try {
-        print('====== MENCOBA UPDATE DATABASE KOLOM: $column ======');
+        debugPrint('====== MENCOBA UPDATE DATABASE KOLOM: $column ======');
         final response = await _dio.patch(
           '/rest/v1/pegawai',
           queryParameters: {
@@ -159,13 +205,13 @@ class ProfileRemoteDataSource {
           options: await _buildRequestOptions(preferRepresentation: true),
         );
 
-        print('Response update status for $column: ${response.statusCode}');
-        print('Response update data for $column: ${response.data}');
+        debugPrint('Response update status for $column: ${response.statusCode}');
+        debugPrint('Response update data for $column: ${response.data}');
 
         if ((response.statusCode == 200 || response.statusCode == 204) &&
             ((response.data is List && (response.data as List).isNotEmpty) ||
                 response.statusCode == 204)) {
-          print('====== UPDATE DATABASE BERHASIL KOLOM: $column ======');
+          debugPrint('====== UPDATE DATABASE BERHASIL KOLOM: $column ======');
           // Catat ke audit_log
           final aktivitas = await AuditLogService.instance.log('Update foto profil');
           if (aktivitas != null) {
@@ -174,9 +220,9 @@ class ProfileRemoteDataSource {
           return true;
         }
       } on DioException catch (e) {
-        print('DioException update kolom $column: ${e.response?.statusCode} - ${e.response?.data ?? e.message}');
+        debugPrint('DioException update kolom $column: ${e.response?.statusCode} - ${e.response?.data ?? e.message}');
       } catch (e) {
-        print('Error update kolom $column: $e');
+        debugPrint('Error update kolom $column: $e');
       }
     }
 

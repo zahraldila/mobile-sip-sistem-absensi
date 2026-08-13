@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_radius.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
@@ -9,6 +11,7 @@ import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
 
 import 'package:sip_sistem_absensi_mobile/features/attendance/services/attendance_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
+import 'package:sip_sistem_absensi_mobile/features/profile/data/datasources/profile_remote_datasource.dart';
 
 /// UI Check In mode Work From Home (WFH).
 /// Metode: GPS/Lokasi + Selfie kamera.
@@ -20,46 +23,66 @@ class CheckInWfhPage extends StatefulWidget {
 }
 
 class _CheckInWfhPageState extends State<CheckInWfhPage> {
-  late Timer _timer;
-  late String _currentTime;
-  late String _currentDate;
-
   _DetectionStatus _locationStatus = _DetectionStatus.idle;
   _DetectionStatus _selfieStatus = _DetectionStatus.idle;
   String _locationText = '';
+  double? _latitude;
+  double? _longitude;
+  String? _selfiePath;
+  String? _uploadedSelfiePath;
+  final ImagePicker _picker = ImagePicker();
 
   bool get _canSubmit =>
       _locationStatus == _DetectionStatus.success &&
       _selfieStatus == _DetectionStatus.success;
 
   @override
-  void initState() {
-    super.initState();
-    _updateTime();
-    _timer = Timer.periodic(const Duration(seconds: 30), (_) => _updateTime());
-  }
-
-  @override
   void dispose() {
-    _timer.cancel();
     super.dispose();
   }
 
-  void _updateTime() {
-    final now = DateTime.now();
-    setState(() {
-      _currentTime = DateFormat('HH:mm').format(now);
-      _currentDate = DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(now);
-    });
-  }
+  Future<bool> _ensureLocationPermission() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      _showSnackbar('Aktifkan layanan lokasi terlebih dahulu', isError: true);
+      return false;
+    }
 
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied) {
+      _showSnackbar('Izin lokasi ditolak', isError: true);
+      return false;
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      _showSnackbar('Izin lokasi ditolak permanen. Buka pengaturan aplikasi.', isError: true);
+      return false;
+    }
+
+    return true;
+  }
   Future<void> _detectLocation() async {
+    final hasPermission = await _ensureLocationPermission();
+    if (!hasPermission) return;
+
     setState(() => _locationStatus = _DetectionStatus.loading);
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() {
-      _locationStatus = _DetectionStatus.success;
-      _locationText = 'Jl. Sudirman No. 12, Jakarta Pusat';
-    });
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.best),
+      );
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+        _locationText = 'Lat ${position.latitude.toStringAsFixed(6)}, Lon ${position.longitude.toStringAsFixed(6)}';
+        _locationStatus = _DetectionStatus.success;
+      });
+    } catch (e) {
+      setState(() => _locationStatus = _DetectionStatus.error);
+      _showSnackbar('Gagal mendeteksi lokasi: $e', isError: true);
+    }
   }
 
   Future<void> _takeSelfie() async {
@@ -67,9 +90,54 @@ class _CheckInWfhPageState extends State<CheckInWfhPage> {
       _showSnackbar('Deteksi lokasi terlebih dahulu', isError: true);
       return;
     }
+
     setState(() => _selfieStatus = _DetectionStatus.loading);
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() => _selfieStatus = _DetectionStatus.success);
+    try {
+      final pickedFile = await _picker.pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.front,
+        imageQuality: 80,
+      );
+
+      if (!mounted) return;
+      if (pickedFile == null) {
+        setState(() => _selfieStatus = _DetectionStatus.idle);
+        return;
+      }
+
+      // Keep local preview path
+      setState(() {
+        _selfiePath = pickedFile.path;
+      });
+
+      // Upload to Supabase Storage (attendance-selfies)
+      final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
+      if (pegawaiId.isEmpty) {
+        setState(() => _selfieStatus = _DetectionStatus.error);
+        _showSnackbar('Gagal mengunggah foto: pegawai tidak ditemukan', isError: true);
+        return;
+      }
+
+      try {
+        final file = File(pickedFile.path);
+        final remotePath = await ProfileRemoteDataSource().uploadAttendanceSelfie(
+          pegawaiId: pegawaiId,
+          imageFile: file,
+        );
+        if (!mounted) return;
+        setState(() {
+          _uploadedSelfiePath = remotePath;
+          _selfieStatus = _DetectionStatus.success;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _selfieStatus = _DetectionStatus.error);
+        _showSnackbar('Gagal mengunggah foto selfie: $e', isError: true);
+      }
+    } catch (e) {
+      setState(() => _selfieStatus = _DetectionStatus.error);
+      _showSnackbar('Gagal mengambil foto selfie: $e', isError: true);
+    }
   }
 
   void _submitCheckIn() async {
@@ -78,9 +146,9 @@ class _CheckInWfhPageState extends State<CheckInWfhPage> {
       await AttendanceService().checkIn(
         pegawaiId: pegawaiId,
         skemaKerja: 'WFH',
-        latitude: -6.2000,
-        longitude: 106.8166,
-        fotoSelfie: 'selfie_wfh.jpg',
+        latitude: _latitude,
+        longitude: _longitude,
+        fotoSelfie: _uploadedSelfiePath ?? _selfiePath,
         catatan: 'Absen WFH dari Rumah',
       );
       _showSnackbar('Check In WFH Berhasil!');
@@ -163,7 +231,7 @@ class _CheckInWfhPageState extends State<CheckInWfhPage> {
             loadingText: 'Memproses foto...',
             accentColor: AppColors.primary,
             previewWidget: _selfieStatus == _DetectionStatus.success
-                ? _SelfiePreview()
+                ? _SelfiePreview(imagePath: _selfiePath)
                 : null,
           ),
 
@@ -204,6 +272,10 @@ class _CheckInWfhPageState extends State<CheckInWfhPage> {
 // ─────────────────────────────────────────────────
 
 class _SelfiePreview extends StatelessWidget {
+  const _SelfiePreview({required this.imagePath});
+
+  final String? imagePath;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -219,8 +291,16 @@ class _SelfiePreview extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            const Icon(Icons.person_outline,
-                size: 48, color: AppColors.textDisabled),
+            if (imagePath != null && File(imagePath!).existsSync())
+              Image.file(
+                File(imagePath!),
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+              )
+            else
+              const Icon(Icons.person_outline,
+                  size: 48, color: AppColors.textDisabled),
             Positioned(
               bottom: 8,
               right: 8,
@@ -252,92 +332,6 @@ class _SelfiePreview extends StatelessWidget {
 // ─────────────────────────────────────────────────
 
 enum _DetectionStatus { idle, loading, success, error }
-
-class _TimeCard extends StatelessWidget {
-  const _TimeCard({required this.time, required this.date});
-  final String time;
-  final String date;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.xl, vertical: AppSpacing.lg),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.secondary, AppColors.secondary],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: AppRadius.large,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withAlpha(80),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Waktu Sekarang',
-                  style: AppTypography.textTheme.labelMedium?.copyWith(
-                    color: Colors.white70,
-                    fontSize: 11,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  time,
-                  style: AppTypography.textTheme.displaySmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 40,
-                    letterSpacing: 2,
-                  ),
-                ),
-                Text(
-                  'WIB',
-                  style: AppTypography.textTheme.labelMedium?.copyWith(
-                    color: Colors.white60,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(30),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.home_outlined,
-                    color: Colors.white, size: 28),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                date,
-                textAlign: TextAlign.right,
-                style: AppTypography.textTheme.labelSmall?.copyWith(
-                  color: Colors.white70,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _InfoBanner extends StatelessWidget {
   const _InfoBanner({

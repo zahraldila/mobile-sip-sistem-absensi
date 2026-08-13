@@ -12,6 +12,7 @@ Future<void> main() async {
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.anonKey,
   );
+  debugPrint('[Supabase] Base URL=${SupabaseConfig.url}');
   await initializeDateFormatting('id', null);
   await AuthState.instance.initialize();
   runApp(const SipSistemAbsensiApp());
