@@ -6,6 +6,10 @@ import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_radius.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
+import 'package:sip_sistem_absensi_mobile/features/attendance/services/attendance_service.dart';
+import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
+// Perbaikan path import, asumsikan service ada di folder sejajar atau parent
+import '../services/nfc_attendance_service.dart';
 
 /// UI Check In mode Work From Office (WFO).
 /// Metode: scan NFC + validasi koneksi Wi-Fi perusahaan.
@@ -22,7 +26,11 @@ class _CheckInWfoPageState extends State<CheckInWfoPage>
   late String _currentTime;
   late String _currentDate;
 
-  // Status deteksi koneksi (simulasi)
+  // Integrasi Service NFC dan penampung UID
+  final NfcAttendanceService _nfcService = NfcAttendanceService();
+  String? _nfcUid;
+
+  // Status deteksi koneksi (simulasi WiFi, Real NFC)
   _DetectionStatus _wifiStatus = _DetectionStatus.idle;
   _DetectionStatus _nfcStatus = _DetectionStatus.idle;
 
@@ -53,6 +61,8 @@ class _CheckInWfoPageState extends State<CheckInWfoPage>
   void dispose() {
     _timer.cancel();
     _pulseController.dispose();
+    // Memastikan sensor mati saat halaman ditutup
+    _nfcService.stopScan();
     super.dispose();
   }
 
@@ -66,6 +76,7 @@ class _CheckInWfoPageState extends State<CheckInWfoPage>
 
   Future<void> _scanWifi() async {
     setState(() => _wifiStatus = _DetectionStatus.loading);
+    // Simulasi deteksi WiFi
     await Future.delayed(const Duration(seconds: 2));
     setState(() => _wifiStatus = _DetectionStatus.success);
   }
@@ -75,13 +86,74 @@ class _CheckInWfoPageState extends State<CheckInWfoPage>
       _showSnackbar('Validasi Wi-Fi terlebih dahulu', isError: true);
       return;
     }
+
     setState(() => _nfcStatus = _DetectionStatus.loading);
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() => _nfcStatus = _DetectionStatus.success);
+
+    try {
+      // 1. Cek ketersediaan hardware
+      bool isAvailable = await _nfcService.isNfcAvailable();
+      if (!isAvailable) {
+        setState(() => _nfcStatus = _DetectionStatus.error);
+        _showSnackbar('Sensor NFC tidak tersedia atau belum diaktifkan di pengaturan', isError: true);
+        return;
+      }
+
+      // 2. Mulai proses scanning
+      String? uid = await _nfcService.scanCard();
+
+      // 3. Update status berdasarkan hasil scan
+      if (uid != null) {
+        final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
+        final isValid = pegawaiId.isNotEmpty &&
+            await AttendanceService().validateNfcForPegawai(
+              pegawaiId: pegawaiId,
+              uid: uid,
+            );
+        if (!isValid) {
+          setState(() => _nfcStatus = _DetectionStatus.error);
+          _showSnackbar('Kartu NFC tidak terdaftar untuk akun Anda.', isError: true);
+          return;
+        }
+        if (!mounted) return;
+        setState(() {
+          _nfcUid = uid; // Simpan UID
+          _nfcStatus = _DetectionStatus.success;
+        });
+        _showSnackbar('Kartu terdeteksi!');
+      } else {
+        setState(() => _nfcStatus = _DetectionStatus.error);
+        _showSnackbar('Gagal membaca kartu, silakan coba lagi', isError: true);
+      }
+    } on AttendanceAuthenticationException {
+      setState(() => _nfcStatus = _DetectionStatus.error);
+      _showSnackbar('Sesi login berakhir. Logout lalu login kembali.', isError: true);
+    } catch (e) {
+      setState(() => _nfcStatus = _DetectionStatus.error);
+      _showSnackbar('Terjadi kesalahan pada sensor', isError: true);
+    }
   }
 
-  void _submitCheckIn() {
-    _showSnackbar('Check In WFO Berhasil!');
+  Future<void> _submitCheckIn() async {
+    final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
+    if (pegawaiId.isEmpty || _nfcUid == null) {
+      _showSnackbar('Data pengguna atau UID NFC tidak tersedia.', isError: true);
+      return;
+    }
+
+    try {
+      await AttendanceService().checkIn(
+        pegawaiId: pegawaiId,
+        skemaKerja: 'WFO',
+        statusKehadiran: 'Hadir',
+        catatan: 'Check-in via NFC [UID NFC: $_nfcUid]',
+      );
+      if (!mounted) return;
+      _showSnackbar('Check In WFO berhasil.');
+      Navigator.of(context).pop(true);
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackbar('Gagal melakukan Check In: $error', isError: true);
+    }
   }
 
   void _showSnackbar(String message, {bool isError = false}) {
@@ -145,7 +217,7 @@ class _CheckInWfoPageState extends State<CheckInWfoPage>
                 ? _scanNfc
                 : null,
             actionLabel: 'Mulai Scan NFC',
-            successText: 'NFC berhasil terdeteksi',
+            successText: 'NFC berhasil terdeteksi (${_nfcUid ?? ''})',
             loadingText: 'Menunggu tap NFC...',
             pulseController: _pulseController,
             pulseAnimation: _pulseAnimation,

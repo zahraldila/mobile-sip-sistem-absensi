@@ -451,8 +451,15 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
     NfcTapDialog.show(
       context,
       isCheckOut: true,
-      onSuccess: () async {
-        await _performWfoCheckOut(pegawaiId, method: 'Sensor NFC', reason: reason);
+      onSuccess: (nfcUid) async {
+        final isValid = await _validateNfc(pegawaiId, nfcUid);
+        if (!isValid) return;
+        await _performWfoCheckOut(
+          pegawaiId,
+          method: 'Sensor NFC',
+          reason: reason,
+          nfcUid: nfcUid,
+        );
       },
     );
   }
@@ -537,6 +544,19 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
           reason: reason,
         );
       }
+    } on AttendanceAuthenticationException {
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.pop(dialogContext!);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sesi login berakhir. Logout lalu login kembali.'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } catch (e) {
       if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!);
@@ -552,7 +572,12 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
     }
   }
 
-  Future<void> _performWfoCheckOut(String pegawaiId, {required String method, String? reason}) async {
+  Future<void> _performWfoCheckOut(
+    String pegawaiId, {
+    required String method,
+    String? reason,
+    String? nfcUid,
+  }) async {
     BuildContext? dialogContext;
     showDialog(
       context: context,
@@ -571,10 +596,11 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       final note = reason != null
           ? 'Check-out via $method (Alasan: $reason)'
           : 'Check-out via $method';
+      final noteWithNfc = nfcUid == null ? note : '$note [UID NFC: $nfcUid]';
 
       await _attendanceService.checkOut(
         pegawaiId: pegawaiId,
-        catatan: note,
+        catatan: noteWithNfc,
       );
 
       if (dialogContext != null && dialogContext!.mounted) {
@@ -592,6 +618,19 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
                 ? 'Anda berhasil check out lebih awal dengan alasan: $reason.'
                 : 'Anda berhasil melakukan check out via $method.',
             onClose: () => Navigator.pop(context),
+          ),
+        );
+      }
+    } on AttendanceAuthenticationException {
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.pop(dialogContext!);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sesi login berakhir. Logout lalu login kembali.'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -616,10 +655,57 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
     NfcTapDialog.show(
       context,
       isCheckOut: false,
-      onSuccess: () async {
-        await _performWfoCheckIn(pegawaiId, method: 'Sensor NFC');
+      onSuccess: (nfcUid) async {
+        final isValid = await _validateNfc(pegawaiId, nfcUid);
+        if (!isValid) return;
+        await _performWfoCheckIn(
+          pegawaiId,
+          method: 'Sensor NFC',
+          nfcUid: nfcUid,
+        );
       },
     );
+  }
+
+  Future<bool> _validateNfc(String pegawaiId, String nfcUid) async {
+    try {
+      final isValid = await _attendanceService.validateNfcForPegawai(
+        pegawaiId: pegawaiId,
+        uid: nfcUid,
+      );
+      if (!isValid && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Kartu NFC tidak terdaftar untuk akun Anda.'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return isValid;
+    } on AttendanceAuthenticationException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sesi login berakhir. Logout lalu login kembali.'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return false;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Validasi kartu NFC ke server gagal. Coba lagi.'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return false;
+    }
   }
 
   /// Menjalankan verifikasi WiFi untuk Check In WFO.
@@ -730,7 +816,11 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
   }
 
   /// Eksekusi pengiriman data check-in WFO ke database dan tampilkan SuccessDialog.
-  Future<void> _performWfoCheckIn(String pegawaiId, {required String method}) async {
+  Future<void> _performWfoCheckIn(
+    String pegawaiId, {
+    required String method,
+    String? nfcUid,
+  }) async {
     BuildContext? dialogContext;
     showDialog(
       context: context,
@@ -751,7 +841,9 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         skemaKerja: 'WFO',
         jadwalId: todayJadwalId,
         statusKehadiran: 'Hadir',
-        catatan: 'Check-in via $method',
+        catatan: nfcUid == null
+            ? 'Check-in via $method'
+            : 'Check-in via $method [UID NFC: $nfcUid]',
       );
 
       if (dialogContext != null && dialogContext!.mounted) {
@@ -803,6 +895,19 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
           await _loadTodayData(isSilent: true);
         }
       });
+    } on AttendanceAuthenticationException {
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.pop(dialogContext!);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sesi login berakhir. Logout lalu login kembali.'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } catch (e) {
       if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!); // Tutup loading dialog secara aman menggunakan dialogContext

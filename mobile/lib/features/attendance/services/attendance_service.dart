@@ -4,9 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
 import 'package:sip_sistem_absensi_mobile/core/services/audit_log_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/attendance/services/activity_service.dart';
-import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
-import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_session_service.dart';
 
 class AttendanceService {
   AttendanceService({Dio? dio})
@@ -19,20 +17,23 @@ class AttendanceService {
 
   final Dio _dio;
 
-  /// Membangun request options dengan menyertakan token autentikasi jika tersedia.
+  /// Membangun request dengan sesi Supabase yang benar-benar aktif.
+  ///
+  /// Jangan gunakan token cache dari login aplikasi sendiri: token kedaluwarsa
+  /// akan membuat PostgREST menolak request dengan 401, bahkan saat policy RLS
+  /// memberi akses kepada role `anon`/`public`.
   Future<Options> _buildOptions() async {
-    String? token = AuthState.instance.currentUser?.accessToken;
-    if (token == null || token.isEmpty) {
-      try {
-        final session = await supabase.Supabase.instance.client.auth.getSession();
-        token = session?.accessToken;
-      } catch (_) {
-        token = supabase.Supabase.instance.client.auth.currentSession?.accessToken;
-      }
+    String? token;
+
+    // Prioritaskan sesi SDK Supabase: token ini dapat diperbarui otomatis
+    // ketika access token lama telah kedaluwarsa.
+    try {
+      final session = await supabase.Supabase.instance.client.auth.getSession();
+      token = session?.accessToken;
+    } catch (_) {
+      token = supabase.Supabase.instance.client.auth.currentSession?.accessToken;
     }
-    if (token == null || token.isEmpty) {
-      token = await AuthSessionService().restoreToken();
-    }
+
     final headers = <String, dynamic>{
       'apikey': SupabaseConfig.anonKey,
       'Content-Type': 'application/json',
@@ -138,6 +139,54 @@ class AttendanceService {
     }
     return null;
   }
+
+  /// Memastikan UID kartu NFC terdaftar untuk pegawai yang sedang absen.
+  ///
+  /// Tabel `nfc` menyimpan nomor kartu pada `nfc_serial_number`. Pemisah
+  /// pembacaan Android (misalnya `:`) diabaikan agar cocok dengan data lama
+  /// yang dapat memakai pemisah lain seperti `#`.
+  Future<bool> validateNfcForPegawai({
+    required String pegawaiId,
+    required String uid,
+  }) async {
+    try {
+      final normalizedPegawaiId = pegawaiId.trim();
+      final pegawaiIdInt = int.tryParse(normalizedPegawaiId);
+      final options = await _buildOptions();
+      final response = await _dio.get(
+        '/rest/v1/nfc',
+        queryParameters: {
+          'select': 'nfc_id,pegawai_id,nfc_serial_number',
+          'pegawai_id': 'eq.${pegawaiIdInt ?? normalizedPegawaiId}',
+        },
+        options: options,
+      );
+
+      if (response.statusCode != 200 || response.data is! List) {
+        throw Exception('Server tidak dapat memvalidasi kartu NFC.');
+      }
+
+      final scannedUid = _normalizeNfcSerial(uid);
+      final records = List<Map<String, dynamic>>.from(response.data as List);
+      return records.any((record) {
+        final registeredUid = record['nfc_serial_number']?.toString() ?? '';
+        return registeredUid.isNotEmpty &&
+            _normalizeNfcSerial(registeredUid) == scannedUid;
+      });
+    } on DioException catch (error) {
+      debugPrint(
+        '[AttendanceService] NFC validation error: '
+        '${error.response?.statusCode} ${error.response?.data ?? error.message}',
+      );
+      if (error.response?.statusCode == 401) {
+        throw const AttendanceAuthenticationException();
+      }
+      rethrow;
+    }
+  }
+
+  String _normalizeNfcSerial(String value) =>
+      value.toUpperCase().replaceAll(RegExp(r'[^A-F0-9]'), '');
 
   /// Mengambil pengajuan yang disetujui (Disetujui) untuk hari ini.
   Future<Map<String, dynamic>?> fetchTodayApprovedSubmission(String pegawaiId) async {
@@ -254,6 +303,9 @@ class AttendanceService {
       }
     } on DioException catch (e) {
       debugPrint('[AttendanceService] DioException during checkIn: ${e.response?.statusCode} ${e.response?.data ?? e.message}');
+      if (e.response?.statusCode == 401) {
+        throw const AttendanceAuthenticationException();
+      }
       rethrow;
     } catch (e) {
       debugPrint('[AttendanceService] Error during checkIn: $e');
@@ -296,9 +348,23 @@ class AttendanceService {
       if (aktivitas != null) {
         ActivityService.instance.recordAuditActivity(aktivitas);
       }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        throw const AttendanceAuthenticationException();
+      }
+      debugPrint('[AttendanceService] Error during checkOut: $e');
+      rethrow;
     } catch (e) {
       debugPrint('[AttendanceService] Error during checkOut: $e');
       rethrow;
     }
   }
+}
+
+class AttendanceAuthenticationException implements Exception {
+  const AttendanceAuthenticationException();
+
+  @override
+  String toString() =>
+      'Sesi login Supabase tidak valid atau sudah berakhir. Silakan logout lalu login kembali.';
 }
