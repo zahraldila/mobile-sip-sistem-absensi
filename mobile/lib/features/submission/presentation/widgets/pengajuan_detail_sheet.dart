@@ -22,7 +22,7 @@ class PengajuanDetailSheet extends StatelessWidget {
   String get _subtitle {
     final createdAt = pengajuan.createdAt;
     if (createdAt != null) {
-      return DateFormat('d MMMM yyyy, HH.mm', 'id_ID').format(createdAt) + ' WIB';
+      return '${DateFormat('d MMMM yyyy, HH.mm', 'id_ID').format(createdAt)} WIB';
     }
     return DateFormat('d MMMM yyyy', 'id_ID').format(pengajuan.tanggal);
   }
@@ -111,7 +111,7 @@ class PengajuanDetailSheet extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: _detailColor.withOpacity(0.12),
+                  color: _detailColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
@@ -120,7 +120,7 @@ class PengajuanDetailSheet extends StatelessWidget {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: _detailColor.withOpacity(0.16),
+                        color: _detailColor.withValues(alpha: 0.16),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Icon(_detailIcon, color: _detailColor, size: 24),
@@ -257,7 +257,7 @@ class _AttachmentCard extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.08),
+                color: AppColors.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: const Icon(Icons.picture_as_pdf, color: AppColors.primary, size: 24),
@@ -281,6 +281,7 @@ class _AttachmentCard extends StatelessWidget {
                   final uri = Uri.parse(publicUrl);
                   final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
                   if (!launched) {
+                    if (!context.mounted) return;
                     showDialog<void>(
                       context: context,
                       builder: (context) => AlertDialog(
@@ -293,6 +294,7 @@ class _AttachmentCard extends StatelessWidget {
                     );
                   }
                 } catch (e) {
+                  if (!context.mounted) return;
                   showDialog<void>(
                     context: context,
                     builder: (context) => AlertDialog(

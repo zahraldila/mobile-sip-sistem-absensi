@@ -316,7 +316,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         debugPrint('[AttendanceHomePage] Error reading WiFi SSID: $e');
       }
 
-      if (dialogContext != null) {
+      if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!);
       }
 
@@ -359,7 +359,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         );
       }
     } catch (e) {
-      if (dialogContext != null) {
+      if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!);
       }
       _showWiFiFailureDialog(
@@ -398,7 +398,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         catatan: note,
       );
 
-      if (dialogContext != null) {
+      if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!);
       }
 
@@ -417,7 +417,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         );
       }
     } catch (e) {
-      if (dialogContext != null) {
+      if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!);
       }
       if (mounted) {
@@ -486,7 +486,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         debugPrint('[AttendanceHomePage] Error reading WiFi SSID: $e');
       }
 
-      if (dialogContext != null) {
+      if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!); // Tutup loading dialog secara aman menggunakan dialogContext
       }
 
@@ -527,7 +527,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         return false;
       }
     } catch (e) {
-      if (dialogContext != null) {
+      if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!); // Tutup loading dialog secara aman menggunakan dialogContext
       }
       _showWiFiFailureDialog(
@@ -565,7 +565,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         catatan: 'Check-in via $method',
       );
 
-      if (dialogContext != null) {
+      if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!); // Tutup loading dialog secara aman menggunakan dialogContext
       }
 
@@ -583,7 +583,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         );
       }
     } catch (e) {
-      if (dialogContext != null) {
+      if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!); // Tutup loading dialog secara aman menggunakan dialogContext
       }
       if (mounted) {

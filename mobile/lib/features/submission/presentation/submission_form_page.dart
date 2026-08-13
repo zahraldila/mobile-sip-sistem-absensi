@@ -4,7 +4,6 @@ import 'package:dio/dio.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:path/path.dart' as path;
 import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
@@ -148,7 +147,7 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
         try {
           // Prepare file object
           File fileToUpload;
-          if (_selectedFile!.path != null && _selectedFile!.path.isNotEmpty) {
+          if (_selectedFile!.path.isNotEmpty) {
             fileToUpload = File(_selectedFile!.path);
           } else {
             // Write bytes to temp file

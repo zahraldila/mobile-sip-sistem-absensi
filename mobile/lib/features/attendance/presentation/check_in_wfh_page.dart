@@ -1,7 +1,5 @@
-import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_radius.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
@@ -20,10 +18,6 @@ class CheckInWfhPage extends StatefulWidget {
 }
 
 class _CheckInWfhPageState extends State<CheckInWfhPage> {
-  late Timer _timer;
-  late String _currentTime;
-  late String _currentDate;
-
   _DetectionStatus _locationStatus = _DetectionStatus.idle;
   _DetectionStatus _selfieStatus = _DetectionStatus.idle;
   String _locationText = '';
@@ -31,27 +25,6 @@ class _CheckInWfhPageState extends State<CheckInWfhPage> {
   bool get _canSubmit =>
       _locationStatus == _DetectionStatus.success &&
       _selfieStatus == _DetectionStatus.success;
-
-  @override
-  void initState() {
-    super.initState();
-    _updateTime();
-    _timer = Timer.periodic(const Duration(seconds: 30), (_) => _updateTime());
-  }
-
-  @override
-  void dispose() {
-    _timer.cancel();
-    super.dispose();
-  }
-
-  void _updateTime() {
-    final now = DateTime.now();
-    setState(() {
-      _currentTime = DateFormat('HH:mm').format(now);
-      _currentDate = DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(now);
-    });
-  }
 
   Future<void> _detectLocation() async {
     setState(() => _locationStatus = _DetectionStatus.loading);
@@ -252,92 +225,6 @@ class _SelfiePreview extends StatelessWidget {
 // ─────────────────────────────────────────────────
 
 enum _DetectionStatus { idle, loading, success, error }
-
-class _TimeCard extends StatelessWidget {
-  const _TimeCard({required this.time, required this.date});
-  final String time;
-  final String date;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.xl, vertical: AppSpacing.lg),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.secondary, AppColors.secondary],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: AppRadius.large,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withAlpha(80),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Waktu Sekarang',
-                  style: AppTypography.textTheme.labelMedium?.copyWith(
-                    color: Colors.white70,
-                    fontSize: 11,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  time,
-                  style: AppTypography.textTheme.displaySmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 40,
-                    letterSpacing: 2,
-                  ),
-                ),
-                Text(
-                  'WIB',
-                  style: AppTypography.textTheme.labelMedium?.copyWith(
-                    color: Colors.white60,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(30),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.home_outlined,
-                    color: Colors.white, size: 28),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                date,
-                textAlign: TextAlign.right,
-                style: AppTypography.textTheme.labelSmall?.copyWith(
-                  color: Colors.white70,
-                  fontSize: 10,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _InfoBanner extends StatelessWidget {
   const _InfoBanner({

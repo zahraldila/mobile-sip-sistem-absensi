@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
@@ -102,8 +103,8 @@ class ProfileRemoteDataSource {
     for (final bucket in _candidateBuckets) {
       try {
         final fullPath = '/storage/v1/object/$bucket/$objectPath';
-        print('====== MENCOBA UPLOAD KE BUCKET: $bucket ======');
-        print('Path: $fullPath');
+        debugPrint('====== MENCOBA UPLOAD KE BUCKET: $bucket ======');
+        debugPrint('Path: $fullPath');
         
         final uploadResponse = await _dio.post(
           fullPath,
@@ -116,11 +117,11 @@ class ProfileRemoteDataSource {
           ),
         );
 
-        print('Response status for $bucket: ${uploadResponse.statusCode}');
-        print('Response data for $bucket: ${uploadResponse.data}');
+        debugPrint('Response status for $bucket: ${uploadResponse.statusCode}');
+        debugPrint('Response data for $bucket: ${uploadResponse.data}');
 
         if (uploadResponse.statusCode == 200 || uploadResponse.statusCode == 201) {
-          print('====== UPLOAD BERHASIL KE BUCKET: $bucket ======');
+          debugPrint('====== UPLOAD BERHASIL KE BUCKET: $bucket ======');
           return '$bucket/$objectPath';
         } else {
           lastError = DioException(
@@ -130,7 +131,7 @@ class ProfileRemoteDataSource {
           );
         }
       } on DioException catch (e) {
-        print('DioException for $bucket: ${e.response?.statusCode} - ${e.response?.data ?? e.message}');
+        debugPrint('DioException for $bucket: ${e.response?.statusCode} - ${e.response?.data ?? e.message}');
         lastError = e;
       }
     }
@@ -146,7 +147,7 @@ class ProfileRemoteDataSource {
   }) async {
     for (final column in _photoColumns) {
       try {
-        print('====== MENCOBA UPDATE DATABASE KOLOM: $column ======');
+        debugPrint('====== MENCOBA UPDATE DATABASE KOLOM: $column ======');
         final response = await _dio.patch(
           '/rest/v1/pegawai',
           queryParameters: {
@@ -157,19 +158,19 @@ class ProfileRemoteDataSource {
           options: await _buildRequestOptions(preferRepresentation: true),
         );
 
-        print('Response update status for $column: ${response.statusCode}');
-        print('Response update data for $column: ${response.data}');
+        debugPrint('Response update status for $column: ${response.statusCode}');
+        debugPrint('Response update data for $column: ${response.data}');
 
         if ((response.statusCode == 200 || response.statusCode == 204) &&
             ((response.data is List && (response.data as List).isNotEmpty) ||
                 response.statusCode == 204)) {
-          print('====== UPDATE DATABASE BERHASIL KOLOM: $column ======');
+          debugPrint('====== UPDATE DATABASE BERHASIL KOLOM: $column ======');
           return true;
         }
       } on DioException catch (e) {
-        print('DioException update kolom $column: ${e.response?.statusCode} - ${e.response?.data ?? e.message}');
+        debugPrint('DioException update kolom $column: ${e.response?.statusCode} - ${e.response?.data ?? e.message}');
       } catch (e) {
-        print('Error update kolom $column: $e');
+        debugPrint('Error update kolom $column: $e');
       }
     }
 
