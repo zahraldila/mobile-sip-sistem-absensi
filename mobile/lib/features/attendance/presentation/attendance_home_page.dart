@@ -225,10 +225,157 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
   }
 
   Future<void> _attemptWfoCheckIn(String pegawaiId) async {
-    final isWiFiValid = await _triggerWiFiCheckIn(pegawaiId);
-    if (!isWiFiValid) {
-      _triggerNfcCheckIn(pegawaiId);
-    }
+    // Tampilkan pilihan metode check-in (NFC atau WiFi) seperti desain bottom-sheet
+    if (!mounted) return;
+    showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      builder: (ctx) {
+        return CheckInMethodSelectionSheet(
+          onNfcSelected: () {
+            Navigator.pop(ctx);
+            _triggerNfcCheckIn(pegawaiId);
+          },
+          onWiFiSelected: () {
+            Navigator.pop(ctx);
+            _triggerWiFiCheckIn(pegawaiId);
+          },
+        );
+      },
+    );
+  }
+
+  // Bottom sheet widget for choosing check-in method (WFO)
+  // UI follows the project's style (rounded sheet, handle, cards)
+  // This widget is placed here for file locality; can be moved to separate file later.
+  // ignore: long-method
+  Widget CheckInMethodSelectionSheet({
+    required VoidCallback onNfcSelected,
+    required VoidCallback onWiFiSelected,
+  }) {
+    return SafeArea(
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.only(top: 12, left: 20, right: 20, bottom: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 6,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE6E9EE),
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Pilih Metode Check In WFO',
+              style: AppTypography.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Silakan pilih salah satu metode absensi kehadiran Anda di area kantor.',
+              style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 18),
+            // NFC Card
+            InkWell(
+              onTap: onNfcSelected,
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBackground,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.nfc, color: Color(0xFF1E60F2)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Tap Kartu NFC', style: AppTypography.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 4),
+                          Text('Tempelkan kartu pegawai ke bagian belakang ponsel Anda.', style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                  ],
+                ),
+              ),
+            ),
+            // WiFi Card
+            InkWell(
+              onTap: onWiFiSelected,
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBackground,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.cardBorder),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FBF6),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.wifi, color: Color(0xFF10B981)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('WiFi Kantor', style: AppTypography.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 4),
+                          Text('Verifikasi kehadiran otomatis dengan tersambung ke WiFi kantor.', style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   bool _isEarlyCheckOut() {
@@ -611,10 +758,17 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         Navigator.pop(dialogContext!); // Tutup loading dialog secara aman menggunakan dialogContext
       }
 
-      await _loadTodayData(isSilent: true);
-
-      // Tampilkan SuccessDialog dengan format desain dari figma/mockup
+      // Optimistic UI update: tampilkan status sudah check-in segera untuk responsifitas.
+      final now = DateTime.now();
+      final displayTime = DateFormat('HH:mm').format(now);
       if (mounted) {
+        setState(() {
+          isCheckedIn = true;
+          checkInTime = displayTime;
+          attendanceMethod = method;
+        });
+
+        // Tampilkan SuccessDialog segera sehingga user mendapatkan feedback cepat.
         showDialog(
           context: context,
           builder: (context) => SuccessDialog(
@@ -624,6 +778,31 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
           ),
         );
       }
+
+      // Lakukan sinkronisasi / polling di background untuk memastikan data server tercermin
+      // tanpa menahan UI atau dialog success.
+      Future(() async {
+        const int maxAttempts = 6;
+        int attempt = 0;
+        bool found = false;
+        while (attempt < maxAttempts && !found) {
+          try {
+            final existing = await _attendanceService.fetchTodayAttendance(pegawaiId);
+            final jamCheckin = existing?['jam_checkin']?.toString();
+            if (jamCheckin != null && jamCheckin.isNotEmpty && jamCheckin != 'null') {
+              found = true;
+              break;
+            }
+          } catch (e) {
+            debugPrint('[AttendanceHomePage] Background polling fetchTodayAttendance attempt $attempt failed: $e');
+          }
+          attempt += 1;
+          await Future.delayed(const Duration(milliseconds: 400));
+        }
+        if (mounted) {
+          await _loadTodayData(isSilent: true);
+        }
+      });
     } catch (e) {
       if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!); // Tutup loading dialog secara aman menggunakan dialogContext
@@ -1010,6 +1189,32 @@ class AttendanceStatusCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 6),
+                    // Jika sudah check-in tampilkan pill metode (hijau) seperti mockup
+                    if (isCheckedIn && !isAlreadyCheckedOut) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE6F8EE),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.verified, size: 16, color: Color(0xFF27AE60)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Metode: $attendanceMethod',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF27AE60),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     Row(
                       children: [
                         const Icon(

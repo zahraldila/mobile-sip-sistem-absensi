@@ -211,7 +211,9 @@ class AttendanceService {
       };
 
       final options = await _buildOptions();
-      options.headers?['Prefer'] = 'return=minimal';
+      // Minta Supabase REST untuk mengembalikan baris yang baru dibuat sehingga
+      // aplikasi bisa langsung memproses respons tanpa perlu polling panjang.
+      options.headers?['Prefer'] = 'return=representation';
 
       debugPrint('[AttendanceService] checkIn payload: pegawai_id=${data['pegawai_id']}, tanggal_absensi=${data['tanggal_absensi']}, jam_checkin=${data['jam_checkin']}, skema_kerja=${data['skema_kerja']}, status_kehadiran=${data['status_kehadiran']}, jadwal_id=${data['jadwal_id']}, latitude=${data['latitude']}, longitude=${data['longitude']}, foto_selfie=${data['foto_selfie']}, catatan=${data['catatan']}');
 
@@ -233,8 +235,16 @@ class AttendanceService {
         throw Exception('Unauthorized (401) during checkIn');
       }
 
-      if (response.statusCode != 201 && response.statusCode != 204) {
+      // Supabase biasanya mengembalikan 201 dengan body ketika `Prefer: return=representation`.
+      if (response.statusCode != 201 && response.statusCode != 204 && response.statusCode != 200) {
         throw Exception('Server returned ${response.statusCode}');
+      }
+
+      // Jika server mengembalikan representasi baris yang baru dibuat, tampilkan debug
+      if (response.data != null) {
+        try {
+          debugPrint('[AttendanceService] checkIn created record: ${response.data}');
+        } catch (_) {}
       }
 
       // Catat ke audit_log
