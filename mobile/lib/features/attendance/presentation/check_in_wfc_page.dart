@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_radius.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
@@ -8,6 +11,7 @@ import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
 
 import 'package:sip_sistem_absensi_mobile/features/attendance/services/attendance_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
+import 'package:sip_sistem_absensi_mobile/features/profile/data/datasources/profile_remote_datasource.dart';
 
 /// UI Check In mode Work From Client (WFC).
 /// Metode: Input nama/lokasi klien + GPS + Selfie.
@@ -22,23 +26,62 @@ class _CheckInWfcPageState extends State<CheckInWfcPage> {
   _DetectionStatus _locationStatus = _DetectionStatus.idle;
   _DetectionStatus _selfieStatus = _DetectionStatus.idle;
   String _locationText = '';
+  double? _latitude;
+  double? _longitude;
+  String? _selfiePath;
+  String? _uploadedSelfiePath;
+  final ImagePicker _picker = ImagePicker();
 
   bool get _canSubmit =>
       _locationStatus == _DetectionStatus.success &&
       _selfieStatus == _DetectionStatus.success;
 
-  @override
-  void dispose() {
-    super.dispose();
+  Future<bool> _ensureLocationPermission() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      _showSnackbar('Aktifkan layanan lokasi terlebih dahulu', isError: true);
+      return false;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied) {
+      _showSnackbar('Izin lokasi ditolak', isError: true);
+      return false;
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      _showSnackbar('Izin lokasi ditolak permanen. Buka pengaturan aplikasi.', isError: true);
+      return false;
+    }
+
+    return true;
   }
 
   Future<void> _detectLocation() async {
+    final hasPermission = await _ensureLocationPermission();
+    if (!hasPermission) return;
+
     setState(() => _locationStatus = _DetectionStatus.loading);
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() {
-      _locationStatus = _DetectionStatus.success;
-      _locationText = 'Lat -6.2146, Lon 106.8451';
-    });
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.best),
+      );
+      if (!mounted) return;
+
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+        _locationText = 'Lat ${position.latitude.toStringAsFixed(6)}, Lon ${position.longitude.toStringAsFixed(6)}';
+        _locationStatus = _DetectionStatus.success;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _locationStatus = _DetectionStatus.error);
+      _showSnackbar('Gagal mendeteksi lokasi: $e', isError: true);
+    }
   }
 
   Future<void> _takeSelfie() async {
@@ -46,9 +89,53 @@ class _CheckInWfcPageState extends State<CheckInWfcPage> {
       _showSnackbar('Deteksi lokasi terlebih dahulu', isError: true);
       return;
     }
+
     setState(() => _selfieStatus = _DetectionStatus.loading);
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() => _selfieStatus = _DetectionStatus.success);
+    try {
+      final pickedFile = await _picker.pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.front,
+        imageQuality: 80,
+      );
+
+      if (!mounted) return;
+      if (pickedFile == null) {
+        setState(() => _selfieStatus = _DetectionStatus.idle);
+        return;
+      }
+
+      setState(() {
+        _selfiePath = pickedFile.path;
+      });
+
+      final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
+      if (pegawaiId.isEmpty) {
+        setState(() => _selfieStatus = _DetectionStatus.error);
+        _showSnackbar('Gagal mengunggah foto: pegawai tidak ditemukan', isError: true);
+        return;
+      }
+
+      try {
+        final file = File(pickedFile.path);
+        final remotePath = await ProfileRemoteDataSource().uploadAttendanceSelfie(
+          pegawaiId: pegawaiId,
+          imageFile: file,
+        );
+        if (!mounted) return;
+        setState(() {
+          _uploadedSelfiePath = remotePath;
+          _selfieStatus = _DetectionStatus.success;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _selfieStatus = _DetectionStatus.error);
+        _showSnackbar('Gagal mengunggah foto selfie: $e', isError: true);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _selfieStatus = _DetectionStatus.error);
+      _showSnackbar('Gagal mengambil foto selfie: $e', isError: true);
+    }
   }
 
   void _submitCheckIn() async {
@@ -57,9 +144,9 @@ class _CheckInWfcPageState extends State<CheckInWfcPage> {
       await AttendanceService().checkIn(
         pegawaiId: pegawaiId,
         skemaKerja: 'WFC',
-        latitude: -6.2146,
-        longitude: 106.8451,
-        fotoSelfie: 'selfie_wfc.jpg',
+        latitude: _latitude,
+        longitude: _longitude,
+        fotoSelfie: _uploadedSelfiePath ?? _selfiePath,
         catatan: 'Absen WFC dari cafe',
       );
       _showSnackbar('Check In WFC Berhasil!');

@@ -141,6 +141,51 @@ class ProfileRemoteDataSource {
     );
   }
 
+  /// Upload selfie untuk attendance ke bucket `attendance-selfies`.
+  /// Mengembalikan path storage seperti: `attendance-selfies/{pegawaiId}/{date}/checkin_{timestamp}.jpg`
+  Future<String> uploadAttendanceSelfie({
+    required String pegawaiId,
+    required File imageFile,
+  }) async {
+    final fileBytes = await imageFile.readAsBytes();
+    final ext = path.extension(imageFile.path).toLowerCase();
+    final safeExt = ext.isNotEmpty ? ext : '.jpg';
+    final contentType = _contentTypeForExtension(safeExt);
+    final date = DateTime.now();
+    final dateStr = '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final timestamp = date.millisecondsSinceEpoch;
+    final objectPath = 'attendance-selfies/${pegawaiId}/${dateStr}/checkin_${timestamp}$safeExt';
+
+    final bucket = 'attendance-selfies';
+
+    try {
+      final fullPath = '/storage/v1/object/$bucket/${path.basename(objectPath)}';
+      // Note: Supabase storage API expects bucket in the path; we include folder structure in object name
+      final uploadResponse = await _dio.post(
+        '/storage/v1/object/$bucket/${pegawaiId}/${dateStr}/checkin_${timestamp}$safeExt',
+        data: fileBytes,
+        options: await _buildRequestOptions(
+          extraHeaders: {
+            'Content-Type': contentType,
+            'x-upsert': 'false',
+          },
+        ),
+      );
+
+      if (uploadResponse.statusCode == 200 || uploadResponse.statusCode == 201) {
+        return '$bucket/${pegawaiId}/${dateStr}/checkin_${timestamp}$safeExt';
+      }
+
+      throw DioException(
+        requestOptions: uploadResponse.requestOptions,
+        response: uploadResponse,
+        message: 'Status code: ${uploadResponse.statusCode}, body: ${uploadResponse.data}',
+      );
+    } on DioException catch (e) {
+      throw Exception('Upload attendance selfie gagal: ${e.response?.statusCode} ${e.response?.data ?? e.message}');
+    }
+  }
+
   Future<bool> updatePegawaiPhoto({
     required String pegawaiId,
     required String photoUrl,

@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_radius.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
@@ -7,6 +11,7 @@ import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
 
 import 'package:sip_sistem_absensi_mobile/features/attendance/services/attendance_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
+import 'package:sip_sistem_absensi_mobile/features/profile/data/datasources/profile_remote_datasource.dart';
 
 /// UI Check In mode Work From Home (WFH).
 /// Metode: GPS/Lokasi + Selfie kamera.
@@ -21,18 +26,63 @@ class _CheckInWfhPageState extends State<CheckInWfhPage> {
   _DetectionStatus _locationStatus = _DetectionStatus.idle;
   _DetectionStatus _selfieStatus = _DetectionStatus.idle;
   String _locationText = '';
+  double? _latitude;
+  double? _longitude;
+  String? _selfiePath;
+  String? _uploadedSelfiePath;
+  final ImagePicker _picker = ImagePicker();
 
   bool get _canSubmit =>
       _locationStatus == _DetectionStatus.success &&
       _selfieStatus == _DetectionStatus.success;
 
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  Future<bool> _ensureLocationPermission() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      _showSnackbar('Aktifkan layanan lokasi terlebih dahulu', isError: true);
+      return false;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied) {
+      _showSnackbar('Izin lokasi ditolak', isError: true);
+      return false;
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      _showSnackbar('Izin lokasi ditolak permanen. Buka pengaturan aplikasi.', isError: true);
+      return false;
+    }
+
+    return true;
+  }
   Future<void> _detectLocation() async {
+    final hasPermission = await _ensureLocationPermission();
+    if (!hasPermission) return;
+
     setState(() => _locationStatus = _DetectionStatus.loading);
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() {
-      _locationStatus = _DetectionStatus.success;
-      _locationText = 'Jl. Sudirman No. 12, Jakarta Pusat';
-    });
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.best),
+      );
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+        _locationText = 'Lat ${position.latitude.toStringAsFixed(6)}, Lon ${position.longitude.toStringAsFixed(6)}';
+        _locationStatus = _DetectionStatus.success;
+      });
+    } catch (e) {
+      setState(() => _locationStatus = _DetectionStatus.error);
+      _showSnackbar('Gagal mendeteksi lokasi: $e', isError: true);
+    }
   }
 
   Future<void> _takeSelfie() async {
@@ -40,9 +90,54 @@ class _CheckInWfhPageState extends State<CheckInWfhPage> {
       _showSnackbar('Deteksi lokasi terlebih dahulu', isError: true);
       return;
     }
+
     setState(() => _selfieStatus = _DetectionStatus.loading);
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() => _selfieStatus = _DetectionStatus.success);
+    try {
+      final pickedFile = await _picker.pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.front,
+        imageQuality: 80,
+      );
+
+      if (!mounted) return;
+      if (pickedFile == null) {
+        setState(() => _selfieStatus = _DetectionStatus.idle);
+        return;
+      }
+
+      // Keep local preview path
+      setState(() {
+        _selfiePath = pickedFile.path;
+      });
+
+      // Upload to Supabase Storage (attendance-selfies)
+      final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
+      if (pegawaiId.isEmpty) {
+        setState(() => _selfieStatus = _DetectionStatus.error);
+        _showSnackbar('Gagal mengunggah foto: pegawai tidak ditemukan', isError: true);
+        return;
+      }
+
+      try {
+        final file = File(pickedFile.path);
+        final remotePath = await ProfileRemoteDataSource().uploadAttendanceSelfie(
+          pegawaiId: pegawaiId,
+          imageFile: file,
+        );
+        if (!mounted) return;
+        setState(() {
+          _uploadedSelfiePath = remotePath;
+          _selfieStatus = _DetectionStatus.success;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _selfieStatus = _DetectionStatus.error);
+        _showSnackbar('Gagal mengunggah foto selfie: $e', isError: true);
+      }
+    } catch (e) {
+      setState(() => _selfieStatus = _DetectionStatus.error);
+      _showSnackbar('Gagal mengambil foto selfie: $e', isError: true);
+    }
   }
 
   void _submitCheckIn() async {
@@ -51,9 +146,9 @@ class _CheckInWfhPageState extends State<CheckInWfhPage> {
       await AttendanceService().checkIn(
         pegawaiId: pegawaiId,
         skemaKerja: 'WFH',
-        latitude: -6.2000,
-        longitude: 106.8166,
-        fotoSelfie: 'selfie_wfh.jpg',
+        latitude: _latitude,
+        longitude: _longitude,
+        fotoSelfie: _uploadedSelfiePath ?? _selfiePath,
         catatan: 'Absen WFH dari Rumah',
       );
       _showSnackbar('Check In WFH Berhasil!');
@@ -136,7 +231,7 @@ class _CheckInWfhPageState extends State<CheckInWfhPage> {
             loadingText: 'Memproses foto...',
             accentColor: AppColors.primary,
             previewWidget: _selfieStatus == _DetectionStatus.success
-                ? _SelfiePreview()
+                ? _SelfiePreview(imagePath: _selfiePath)
                 : null,
           ),
 
@@ -177,6 +272,10 @@ class _CheckInWfhPageState extends State<CheckInWfhPage> {
 // ─────────────────────────────────────────────────
 
 class _SelfiePreview extends StatelessWidget {
+  const _SelfiePreview({required this.imagePath});
+
+  final String? imagePath;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -192,8 +291,16 @@ class _SelfiePreview extends StatelessWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            const Icon(Icons.person_outline,
-                size: 48, color: AppColors.textDisabled),
+            if (imagePath != null && File(imagePath!).existsSync())
+              Image.file(
+                File(imagePath!),
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+              )
+            else
+              const Icon(Icons.person_outline,
+                  size: 48, color: AppColors.textDisabled),
             Positioned(
               bottom: 8,
               right: 8,
