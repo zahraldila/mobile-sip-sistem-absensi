@@ -228,6 +228,9 @@ class _CheckInWfcPageState extends State<CheckInWfcPage> {
             successText: 'Foto selfie berhasil diambil',
             loadingText: 'Memproses foto...',
             accentColor: AppColors.primary,
+            previewWidget: _selfieStatus == _DetectionStatus.success
+                ? _SelfiePreview(imagePath: _selfiePath)
+                : null,
           ),
 
           const SizedBox(height: AppSpacing.xl),
@@ -257,6 +260,66 @@ class _CheckInWfcPageState extends State<CheckInWfcPage> {
           ),
           const SizedBox(height: AppSpacing.xxl),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────
+// Widgets lokal WFC
+// ─────────────────────────────────────────────────
+
+class _SelfiePreview extends StatelessWidget {
+  const _SelfiePreview({required this.imagePath});
+
+  final String? imagePath;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 120,
+      margin: const EdgeInsets.only(top: AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: AppRadius.medium,
+        border: Border.all(color: AppColors.success.withAlpha(80)),
+      ),
+      child: ClipRRect(
+        borderRadius: AppRadius.medium,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (imagePath != null && File(imagePath!).existsSync())
+              Image.file(
+                File(imagePath!),
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+              )
+            else
+              const Icon(Icons.person_outline,
+                  size: 48, color: AppColors.textDisabled),
+            Positioned(
+              bottom: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.success,
+                  borderRadius: AppRadius.pill,
+                ),
+                child: Text(
+                  'Terverifikasi',
+                  style: AppTypography.textTheme.labelSmall?.copyWith(
+                    color: Colors.white,
+                    fontSize: 9,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -341,6 +404,7 @@ class _StepCard extends StatelessWidget {
     required this.successText,
     required this.loadingText,
     this.accentColor = AppColors.primary,
+    this.previewWidget,
   });
 
   final int step;
@@ -353,6 +417,7 @@ class _StepCard extends StatelessWidget {
   final String successText;
   final String loadingText;
   final Color accentColor;
+  final Widget? previewWidget;
 
   Color get _statusColor {
     switch (status) {
@@ -484,6 +549,7 @@ class _StepCard extends StatelessWidget {
                 ],
               ),
             ),
+            ?previewWidget,
             const SizedBox(height: AppSpacing.sm),
           ],
           if (onAction != null)
