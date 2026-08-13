@@ -67,15 +67,17 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
   }
 
   /// Mengambil data jadwal kerja dan status absensi secara dinamis dari Supabase.
-  Future<void> _loadTodayData() async {
+  Future<void> _loadTodayData({bool isSilent = false}) async {
     if (!mounted) return;
-    setState(() {
-      isLoading = true;
-    });
+    if (!isSilent) {
+      setState(() {
+        isLoading = true;
+      });
+    }
 
     final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
     if (pegawaiId.isEmpty) {
-      if (mounted) {
+      if (mounted && !isSilent) {
         setState(() {
           isLoading = false;
         });
@@ -120,7 +122,11 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       final jamCheckin = attendance['jam_checkin']?.toString();
       final jamCheckout = attendance['jam_checkout']?.toString();
       final skema = attendance['skema_kerja']?.toString().toUpperCase() ?? 'WFO';
-      
+
+      // Derive boolean flags explicitly from DB values
+      final hasCheckIn = jamCheckin != null && jamCheckin.isNotEmpty && jamCheckin != 'null';
+      final hasCheckOut = jamCheckout != null && jamCheckout.isNotEmpty && jamCheckout != 'null';
+
       setState(() {
         if (skema == 'WFH') {
           currentMode = AttendanceMode.wfh;
@@ -130,13 +136,21 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
           attendanceMethod = 'GPS & Foto Selfie (WFC)';
         } else {
           currentMode = AttendanceMode.wfo;
-          attendanceMethod = 'NFC - Validasi Wi-Fi Perusahaan';
+          final catatan = attendance['catatan']?.toString() ?? '';
+          if (catatan.contains('WiFi')) {
+            attendanceMethod = 'WiFi Kantor';
+          } else if (catatan.contains('NFC')) {
+            attendanceMethod = 'Sensor NFC Kantor';
+          } else {
+            attendanceMethod = 'NFC - Validasi Wi-Fi Perusahaan';
+          }
         }
 
-        if (jamCheckin != null) {
-          isCheckedIn = jamCheckout == null;
-          isAlreadyCheckedOut = jamCheckout != null;
-          
+        // Set UI state according to presence of jam_checkin / jam_checkout
+        isCheckedIn = hasCheckIn && !hasCheckOut;
+        isAlreadyCheckedOut = hasCheckOut;
+
+        if (hasCheckIn) {
           final parsedCheckIn = DateTime.tryParse(jamCheckin)?.toLocal();
           if (parsedCheckIn != null) {
             checkInTime = DateFormat('HH:mm').format(parsedCheckIn);
@@ -158,7 +172,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       });
     }
 
-    if (mounted) {
+    if (mounted && !isSilent) {
       setState(() {
         isLoading = false;
       });
@@ -175,19 +189,37 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       } else {
         // Untuk WFH / WFC: buka halaman check-out dengan catatan kerja
         final result = await context.push<bool>('/attendance/check-out');
-        if (result == true) {
-          await _loadTodayData();
+        if (result == true || result == null) {
+          await _loadTodayData(isSilent: true);
         }
       }
     } else {
+      // Guard: Cek apakah pegawai sudah pernah check-in hari ini di database
+      final existing = await _attendanceService.fetchTodayAttendance(pegawaiId);
+      if (existing != null) {
+        final jamCheckin = existing['jam_checkin']?.toString();
+        if (jamCheckin != null && jamCheckin.isNotEmpty && jamCheckin != 'null') {
+          await _loadTodayData(isSilent: true);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Anda sudah melakukan check-in hari ini.'),
+                backgroundColor: AppColors.warning,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
       if (currentMode == AttendanceMode.wfo) {
         await _attemptWfoCheckIn(pegawaiId);
       } else {
         // Untuk WFH / WFC (setelah disetujui): buka halaman proses selfie & GPS
-        final result = await context.push<bool>('/attendance/check-in', extra: currentMode);
-        if (result == true) {
-          await _loadTodayData();
-        }
+        if (!mounted) return;
+        await context.push<bool>('/attendance/check-in', extra: currentMode);
+        await _loadTodayData(isSilent: true);
       }
     }
   }
@@ -316,7 +348,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         debugPrint('[AttendanceHomePage] Error reading WiFi SSID: $e');
       }
 
-      if (dialogContext != null) {
+      if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!);
       }
 
@@ -359,7 +391,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         );
       }
     } catch (e) {
-      if (dialogContext != null) {
+      if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!);
       }
       _showWiFiFailureDialog(
@@ -398,11 +430,11 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         catatan: note,
       );
 
-      if (dialogContext != null) {
+      if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!);
       }
 
-      await _loadTodayData();
+      await _loadTodayData(isSilent: true);
 
       if (mounted) {
         showDialog(
@@ -417,7 +449,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         );
       }
     } catch (e) {
-      if (dialogContext != null) {
+      if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!);
       }
       if (mounted) {
@@ -460,6 +492,11 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
     // Memberi waktu 100ms agar dialog route didaftarkan sepenuhnya ke Navigator
     await Future.delayed(const Duration(milliseconds: 100));
 
+    List<Map<String, dynamic>> officeWiFis = [];
+    String? currentSsid;
+    bool hasDetectionError = false;
+    String? detectionErrorMsg;
+
     try {
       // Minta izin lokasi di Android agar diperbolehkan membaca SSID WiFi
       try {
@@ -472,11 +509,10 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       }
 
       // 1. Ambil daftar wifi kantor aktif dari database
-      final officeWiFis = await _attendanceService.fetchActiveOfficeWiFi();
+      officeWiFis = await _attendanceService.fetchActiveOfficeWiFi();
 
       // 2. Baca SSID WiFi perangkat lokal
       final info = NetworkInfo();
-      String? currentSsid;
       try {
         currentSsid = await info.getWifiName();
         if (currentSsid != null) {
@@ -485,56 +521,62 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       } catch (e) {
         debugPrint('[AttendanceHomePage] Error reading WiFi SSID: $e');
       }
-
-      if (dialogContext != null) {
-        Navigator.pop(dialogContext!); // Tutup loading dialog secara aman menggunakan dialogContext
-      }
-
-      if (officeWiFis.isEmpty) {
-        _showWiFiFailureDialog(
-          pegawaiId: pegawaiId,
-          detectedSsid: currentSsid,
-          officeSsids: [],
-          errorMsg: 'Tidak ada WiFi Kantor aktif yang terdaftar di database.',
-        );
-        return false;
-      }
-
-      // Ambil seluruh nama SSID kantor yang aktif
-      final officeSsids = officeWiFis
-          .map((w) => w['ssid']?.toString().trim().replaceAll('"', '').replaceAll("'", "") ?? '')
-          .where((s) => s.isNotEmpty)
-          .toList();
-
-      // 3. Cocokkan SSID ponsel dengan daftar SSID kantor
-      bool isMatched = false;
-      if (currentSsid != null && currentSsid.isNotEmpty) {
-        isMatched = officeSsids.any((officeSsid) =>
-            officeSsid.toLowerCase() == currentSsid!.toLowerCase());
-      }
-
-      if (isMatched) {
-        // Cocok! Jalankan Check In langsung
-        await _performWfoCheckIn(pegawaiId, method: 'WiFi Kantor ($currentSsid)');
-        return true;
-      } else {
-        // Tidak cocok/gagal deteksi.
-        _showWiFiFailureDialog(
-          pegawaiId: pegawaiId,
-          detectedSsid: currentSsid,
-          officeSsids: officeSsids,
-        );
-        return false;
-      }
     } catch (e) {
-      if (dialogContext != null) {
-        Navigator.pop(dialogContext!); // Tutup loading dialog secara aman menggunakan dialogContext
+      hasDetectionError = true;
+      detectionErrorMsg = 'Terjadi kegagalan sistem deteksi WiFi: $e';
+    } finally {
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.pop(dialogContext!); // Tutup loading dialog secara aman
       }
+    }
+
+    if (hasDetectionError) {
       _showWiFiFailureDialog(
         pegawaiId: pegawaiId,
         detectedSsid: null,
         officeSsids: [],
-        errorMsg: 'Terjadi kegagalan sistem deteksi WiFi: $e',
+        errorMsg: detectionErrorMsg,
+      );
+      return false;
+    }
+
+    if (officeWiFis.isEmpty) {
+      _showWiFiFailureDialog(
+        pegawaiId: pegawaiId,
+        detectedSsid: currentSsid,
+        officeSsids: [],
+        errorMsg: 'Tidak ada WiFi Kantor aktif yang terdaftar di database.',
+      );
+      return false;
+    }
+
+    // Ambil seluruh nama SSID kantor yang aktif
+    final officeSsids = officeWiFis
+        .map((w) => w['ssid']?.toString().trim().replaceAll('"', '').replaceAll("'", "") ?? '')
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    // 3. Cocokkan SSID ponsel dengan daftar SSID kantor
+    bool isMatched = false;
+    if (currentSsid != null && currentSsid.isNotEmpty && currentSsid != '<unknown ssid>') {
+      isMatched = officeSsids.any((officeSsid) =>
+          officeSsid.toLowerCase() == currentSsid!.toLowerCase());
+    }
+
+    if (isMatched) {
+      // Perangkat terhubung ke WiFi kantor aktif! Lakukan check in via WiFi.
+      try {
+        await _performWfoCheckIn(pegawaiId, method: 'WiFi Kantor ($currentSsid)');
+      } catch (e) {
+        debugPrint('[AttendanceHomePage] Error in _performWfoCheckIn: $e');
+      }
+      return true; // Return true agar TIDAK me-redirect ke NFC
+    } else {
+      // Tidak cocok/gagal deteksi. Tampilkan dialog failure WiFi.
+      _showWiFiFailureDialog(
+        pegawaiId: pegawaiId,
+        detectedSsid: currentSsid,
+        officeSsids: officeSsids,
       );
       return false;
     }
@@ -565,11 +607,11 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         catatan: 'Check-in via $method',
       );
 
-      if (dialogContext != null) {
+      if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!); // Tutup loading dialog secara aman menggunakan dialogContext
       }
 
-      await _loadTodayData();
+      await _loadTodayData(isSilent: true);
 
       // Tampilkan SuccessDialog dengan format desain dari figma/mockup
       if (mounted) {
@@ -583,7 +625,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         );
       }
     } catch (e) {
-      if (dialogContext != null) {
+      if (dialogContext != null && dialogContext!.mounted) {
         Navigator.pop(dialogContext!); // Tutup loading dialog secara aman menggunakan dialogContext
       }
       if (mounted) {
