@@ -57,7 +57,7 @@ class AuditLogService {
         data: {
           'akun_id': resolvedAkunId,
           'aktivitas': aktivitasLengkap,
-          'waktu_log': DateTime.now().toIso8601String(),
+          'waktu_log': DateTime.now().toUtc().toIso8601String(),
         },
       );
 

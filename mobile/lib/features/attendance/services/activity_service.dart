@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 
@@ -278,7 +280,15 @@ class ActivityService extends ChangeNotifier {
         }
       }
 
-      // Sertakan juga aktivitas lokal sesi hari ini (agar tidak terhapus saat berpindah tab)
+      // Restorasi juga aktivitas lokal sesi hari ini dari SharedPreferences (persisten saat hot restart)
+      final savedLocals = await _loadSavedLocalActivities();
+      for (final saved in savedLocals) {
+        if (!newActivities.any((a) => a.id == saved.id || (a.title == saved.title && a.timeText == saved.timeText))) {
+          newActivities.add(saved);
+        }
+      }
+
+      // Sertakan juga aktivitas lokal sesi hari ini
       final now = DateTime.now();
       for (final existing in _activities) {
         if (existing.createdAt.year == now.year &&
@@ -320,7 +330,66 @@ class ActivityService extends ChangeNotifier {
       createdAt: now,
     );
     _activities.insert(0, item);
+    _saveLocalActivities();
     notifyListeners();
+  }
+
+  static const _localActivitiesKey = 'today_local_activities';
+
+  Future<void> _saveLocalActivities() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now();
+      final todayItems = _activities.where((item) {
+        return item.createdAt.year == now.year &&
+            item.createdAt.month == now.month &&
+            item.createdAt.day == now.day &&
+            item.id.startsWith('local_');
+      }).map((item) => {
+        'id': item.id,
+        'title': item.title,
+        'subtitle': item.subtitle,
+        'timeText': item.timeText,
+        'statusLabel': item.statusLabel,
+        'createdAt': item.createdAt.toIso8601String(),
+      }).toList();
+
+      await prefs.setString(_localActivitiesKey, jsonEncode(todayItems));
+    } catch (e) {
+      debugPrint('[ActivityService] Error saving local activities: $e');
+    }
+  }
+
+  Future<List<ActivityItemData>> _loadSavedLocalActivities() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_localActivitiesKey);
+      if (raw == null || raw.isEmpty) return [];
+
+      final List list = jsonDecode(raw);
+      final now = DateTime.now();
+      final List<ActivityItemData> restored = [];
+
+      for (final map in list) {
+        final dt = DateTime.tryParse(map['createdAt']?.toString() ?? '')?.toLocal();
+        if (dt != null && dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+          restored.add(
+            ActivityItemData.info(
+              id: map['id']?.toString() ?? 'local_${dt.millisecondsSinceEpoch}',
+              title: map['title']?.toString() ?? 'Profil Diperbarui',
+              subtitle: map['subtitle']?.toString() ?? 'Informasi kontak berhasil diperbarui',
+              timeText: map['timeText']?.toString() ?? _formatActivityTime(dt),
+              status: map['statusLabel']?.toString() ?? 'Diperbarui',
+              createdAt: dt,
+            ),
+          );
+        }
+      }
+      return restored;
+    } catch (e) {
+      debugPrint('[ActivityService] Error restoring local activities: $e');
+      return [];
+    }
   }
 
   ActivityItemData _activityFromAuditLog({
