@@ -195,8 +195,9 @@ class ActivityService extends ChangeNotifier {
                 final dt = DateTime.tryParse(checkInStr)?.toLocal();
                 if (dt != null) {
                   final timeText = _formatActivityTime(dt);
-                  final subtitle = catatan.isNotEmpty
-                      ? catatan
+                  final isCheckoutNote = catatan.toLowerCase().contains('check-out') || catatan.toLowerCase().contains('checkout');
+                  final subtitle = (catatan.isNotEmpty && !isCheckoutNote)
+                      ? _cleanCatatan(catatan)
                       : 'Anda berhasil melakukan check in ($skema)';
                   newActivities.add(
                     ActivityItemData.checkIn(
@@ -215,8 +216,9 @@ class ActivityService extends ChangeNotifier {
                 final dt = DateTime.tryParse(checkOutStr)?.toLocal();
                 if (dt != null) {
                   final timeText = _formatActivityTime(dt);
-                  final subtitle = catatan.isNotEmpty
-                      ? catatan
+                  final isCheckoutNote = catatan.toLowerCase().contains('check-out') || catatan.toLowerCase().contains('checkout');
+                  final subtitle = (catatan.isNotEmpty && isCheckoutNote)
+                      ? _cleanCatatan(catatan)
                       : 'Anda berhasil melakukan check out ($skema)';
                   newActivities.add(
                     ActivityItemData.checkOut(
@@ -280,21 +282,22 @@ class ActivityService extends ChangeNotifier {
         }
       }
 
-      // Restorasi juga aktivitas lokal sesi hari ini dari SharedPreferences (persisten saat hot restart)
+      // Restorasi aktivitas lokal sesi hari ini dari SharedPreferences
       final savedLocals = await _loadSavedLocalActivities();
       for (final saved in savedLocals) {
-        if (!newActivities.any((a) => a.id == saved.id || (a.title == saved.title && a.timeText == saved.timeText))) {
+        if (!newActivities.any((a) => a.id == saved.id || (a.title == saved.title && a.createdAt.difference(saved.createdAt).abs().inMinutes < 5))) {
           newActivities.add(saved);
         }
       }
 
-      // Sertakan juga aktivitas lokal sesi hari ini
+      // Sertakan juga aktivitas lokal yang sedang aktif di memori
       final now = DateTime.now();
       for (final existing in _activities) {
-        if (existing.createdAt.year == now.year &&
+        if (existing.id.startsWith('local_') &&
+            existing.createdAt.year == now.year &&
             existing.createdAt.month == now.month &&
             existing.createdAt.day == now.day) {
-          if (!newActivities.any((a) => a.id == existing.id || (a.title == existing.title && a.timeText == existing.timeText))) {
+          if (!newActivities.any((a) => a.id == existing.id || (a.title == existing.title && a.createdAt.difference(existing.createdAt).abs().inMinutes < 5))) {
             newActivities.add(existing);
           }
         }
@@ -313,6 +316,7 @@ class ActivityService extends ChangeNotifier {
       _activities.clear();
       _activities.addAll(todayActivities);
       _loadedAkunId = akunId;
+      await _saveLocalActivities();
       notifyListeners();
     } catch (e) {
       debugPrint('[ActivityService] Error loading activities from DB: $e');
@@ -545,5 +549,10 @@ class ActivityService extends ChangeNotifier {
     );
     _activities.insert(0, item);
     notifyListeners();
+  }
+
+  /// Membersihkan tag teknis internal seperti [UID NFC: xx:xx:xx:xx] agar subtitle bersih untuk pengguna
+  String _cleanCatatan(String raw) {
+    return raw.replaceAll(RegExp(r'\s*\[UID NFC:[^\]]+\]', caseSensitive: false), '').trim();
   }
 }
