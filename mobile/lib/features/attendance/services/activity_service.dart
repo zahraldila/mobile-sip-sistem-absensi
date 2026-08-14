@@ -142,7 +142,8 @@ class ActivityService extends ChangeNotifier {
   Future<void> loadActivitiesFromDatabase() async {
     final currentUser = AuthState.instance.currentUser;
     final akunId = currentUser?.akunId ?? '';
-    if (akunId.isEmpty) {
+    final pegawaiId = currentUser?.pegawaiId ?? '';
+    if (akunId.isEmpty && pegawaiId.isEmpty) {
       _loadedAkunId = null;
       _activities.clear();
       notifyListeners();
@@ -163,50 +164,144 @@ class ActivityService extends ChangeNotifier {
       };
 
       final dio = Dio(BaseOptions(baseUrl: SupabaseConfig.url, headers: headers));
-
-      final response = await dio.get(
-        '/rest/v1/audit_log',
-        queryParameters: {
-          'akun_id': 'eq.$akunId',
-          'select': 'log_id,aktivitas,waktu_log',
-          'order': 'waktu_log.desc',
-        },
-      );
-
       final List<ActivityItemData> newActivities = [];
 
-      if (response.statusCode == 200 && response.data is List) {
-        final list = response.data as List;
-        for (final item in list) {
-          final map = item as Map<String, dynamic>;
-          final aktivitas = map['aktivitas']?.toString().trim() ?? '';
-          final waktuLog = DateTime.tryParse(map['waktu_log']?.toString() ?? '')?.toLocal();
-
-          if (aktivitas.isEmpty || waktuLog == null) {
-            continue;
-          }
-
-          newActivities.add(
-            _activityFromAuditLog(
-              id: map['log_id']?.toString() ?? 'audit_${waktuLog.millisecondsSinceEpoch}',
-              aktivitas: aktivitas,
-              createdAt: waktuLog,
-            ),
+      // 1. Ambil data absensi nyata (Check In & Check Out) dari tabel absensi
+      if (pegawaiId.isNotEmpty) {
+        try {
+          final absensiRes = await dio.get(
+            '/rest/v1/absensi',
+            queryParameters: {
+              'pegawai_id': 'eq.$pegawaiId',
+              'select': 'absensi_id,tanggal_absensi,jam_checkin,jam_checkout,skema_kerja,catatan',
+              'order': 'tanggal_absensi.desc,absensi_id.desc',
+              'limit': '20',
+            },
           );
+
+          if (absensiRes.statusCode == 200 && absensiRes.data is List) {
+            final list = absensiRes.data as List;
+            for (final item in list) {
+              final map = item as Map<String, dynamic>;
+              final absensiId = map['absensi_id']?.toString() ?? '';
+              final skema = map['skema_kerja']?.toString() ?? 'WFO';
+              final catatan = map['catatan']?.toString() ?? '';
+
+              // Check In
+              final checkInStr = map['jam_checkin']?.toString();
+              if (checkInStr != null && checkInStr.isNotEmpty && checkInStr != 'null') {
+                final dt = DateTime.tryParse(checkInStr)?.toLocal();
+                if (dt != null) {
+                  final timeText = _formatActivityTime(dt);
+                  final subtitle = catatan.isNotEmpty
+                      ? catatan
+                      : 'Anda berhasil melakukan check in ($skema)';
+                  newActivities.add(
+                    ActivityItemData.checkIn(
+                      id: 'checkin_$absensiId',
+                      subtitle: subtitle,
+                      timeText: timeText,
+                      createdAt: dt,
+                    ),
+                  );
+                }
+              }
+
+              // Check Out
+              final checkOutStr = map['jam_checkout']?.toString();
+              if (checkOutStr != null && checkOutStr.isNotEmpty && checkOutStr != 'null') {
+                final dt = DateTime.tryParse(checkOutStr)?.toLocal();
+                if (dt != null) {
+                  final timeText = _formatActivityTime(dt);
+                  final subtitle = catatan.isNotEmpty
+                      ? catatan
+                      : 'Anda berhasil melakukan check out ($skema)';
+                  newActivities.add(
+                    ActivityItemData.checkOut(
+                      id: 'checkout_$absensiId',
+                      subtitle: subtitle,
+                      timeText: timeText,
+                      createdAt: dt,
+                    ),
+                  );
+                }
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('[ActivityService] Error fetching absensi table: $e');
         }
       }
 
-      // Urutkan berdasarkan waktu terbaru
-      newActivities.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      // 2. Ambil data aktivitas audit tambahan (Profil, Pengajuan, dll) dari audit_log
+      if (akunId.isNotEmpty) {
+        try {
+          final resolvedAkunId = int.tryParse(akunId) ?? akunId;
+          final auditRes = await dio.get(
+            '/rest/v1/audit_log',
+            queryParameters: {
+              'akun_id': 'eq.$resolvedAkunId',
+              'select': 'log_id,aktivitas,waktu_log',
+              'order': 'waktu_log.desc',
+              'limit': '20',
+            },
+          );
 
-      if (newActivities.isEmpty) {
-        _loadedAkunId = akunId;
-        notifyListeners();
-        return;
+          if (auditRes.statusCode == 200 && auditRes.data is List) {
+            final list = auditRes.data as List;
+            for (final item in list) {
+              final map = item as Map<String, dynamic>;
+              final aktivitas = map['aktivitas']?.toString().trim() ?? '';
+              final waktuLog = DateTime.tryParse(map['waktu_log']?.toString() ?? '')?.toLocal();
+
+              if (aktivitas.isEmpty || waktuLog == null) {
+                continue;
+              }
+
+              final norm = aktivitas.toLowerCase();
+              // Lewati log Check In / Check Out dari audit_log karena sudah diambil secara presisi dari tabel absensi
+              if (norm.contains('check in') || norm.contains('check out')) {
+                continue;
+              }
+
+              newActivities.add(
+                _activityFromAuditLog(
+                  id: map['log_id']?.toString() ?? 'audit_${waktuLog.millisecondsSinceEpoch}',
+                  aktivitas: aktivitas,
+                  createdAt: waktuLog,
+                ),
+              );
+            }
+          }
+        } catch (e) {
+          debugPrint('[ActivityService] Error fetching audit_log table: $e');
+        }
       }
 
+      // Sertakan juga aktivitas lokal sesi hari ini (agar tidak terhapus saat berpindah tab)
+      final now = DateTime.now();
+      for (final existing in _activities) {
+        if (existing.createdAt.year == now.year &&
+            existing.createdAt.month == now.month &&
+            existing.createdAt.day == now.day) {
+          if (!newActivities.any((a) => a.id == existing.id || (a.title == existing.title && a.timeText == existing.timeText))) {
+            newActivities.add(existing);
+          }
+        }
+      }
+
+      // Filter HANYA aktivitas HARI INI
+      final todayActivities = newActivities.where((item) {
+        return item.createdAt.year == now.year &&
+            item.createdAt.month == now.month &&
+            item.createdAt.day == now.day;
+      }).toList();
+
+      // Urutkan seluruh aktivitas gabungan hari ini berdasarkan waktu terbaru
+      todayActivities.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
       _activities.clear();
-      _activities.addAll(newActivities);
+      _activities.addAll(todayActivities);
       _loadedAkunId = akunId;
       notifyListeners();
     } catch (e) {
@@ -287,11 +382,14 @@ class ActivityService extends ChangeNotifier {
       );
     }
 
-    if (normalized.contains('update data profil') || normalized.contains('profil') || normalized.contains('kontak')) {
+    if (normalized.contains('update data profil') ||
+        normalized.contains('profil') ||
+        normalized.contains('kontak') ||
+        normalized.contains('memperbarui informasi kontak')) {
       return ActivityItemData.info(
         id: id,
         title: 'Profil Diperbarui',
-        subtitle: aktivitas,
+        subtitle: 'Informasi kontak berhasil diperbarui',
         timeText: timeText,
         status: 'Diperbarui',
         createdAt: createdAt,

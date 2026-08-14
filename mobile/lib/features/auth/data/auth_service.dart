@@ -351,10 +351,8 @@ class AuthService {
 
       if (success) {
         // Catat ke audit_log & ActivityService
-        final aktivitas = await AuditLogService.instance.log('Update data profil');
-        if (aktivitas != null) {
-          ActivityService.instance.recordAuditActivity(aktivitas);
-        }
+        AuditLogService.instance.log('Update data profil');
+        ActivityService.instance.recordAuditActivity('Memperbarui informasi kontak profil');
       }
 
       return success;

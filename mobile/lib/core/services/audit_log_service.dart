@@ -51,10 +51,11 @@ class AuditLogService {
         ),
       );
 
+      final resolvedAkunId = int.tryParse(akunId) ?? akunId;
       final response = await dio.post(
         '/rest/v1/audit_log',
         data: {
-          'akun_id': akunId,
+          'akun_id': resolvedAkunId,
           'aktivitas': aktivitasLengkap,
           'waktu_log': DateTime.now().toIso8601String(),
         },
