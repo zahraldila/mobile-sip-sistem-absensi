@@ -1014,7 +1014,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
     }
   }
 
-  /// Menampilkan dialog jika verifikasi WiFi kantor tidak cocok.
+  /// Menampilkan bottom sheet jika verifikasi WiFi kantor tidak cocok.
   void _showWiFiFailureDialog({
     required String pegawaiId,
     required String? detectedSsid,
@@ -1023,79 +1023,19 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
     bool isCheckOut = false,
     String? reason,
   }) {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            const Icon(Icons.wifi_off_rounded, color: Colors.amber, size: 28),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                isCheckOut ? 'WiFi Kantor Tidak Sesuai (Check Out)' : 'WiFi Kantor Tidak Sesuai',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              errorMsg ?? 'SSID WiFi perangkat Anda saat ini tidak terdaftar sebagai WiFi kantor resmi.',
-              style: TextStyle(fontSize: 13, color: Colors.grey[600], height: 1.3),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[200]!),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'WiFi Terdeteksi:',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[500]),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    detectedSsid != null ? '"$detectedSsid"' : '(Tidak Terdeteksi/Butuh Izin)',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'WiFi Kantor Terdaftar:',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[500]),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    officeSsids.isNotEmpty ? officeSsids.join('\n') : '-',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Batal',
-              style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      builder: (context) => WiFiFailureSheet(
+        detectedSsid: detectedSsid,
+        officeSsids: officeSsids,
+        errorMsg: errorMsg,
       ),
     );
   }
@@ -2566,6 +2506,252 @@ class _EarlyCheckOutSheetState extends State<EarlyCheckOutSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class WiFiFailureSheet extends StatelessWidget {
+  final String? detectedSsid;
+  final List<String> officeSsids;
+  final String? errorMsg;
+  final bool isCheckOut;
+
+  const WiFiFailureSheet({
+    super.key,
+    required this.detectedSsid,
+    required this.officeSsids,
+    this.errorMsg,
+    this.isCheckOut = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Handle Indicator
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Header Icon & Title
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFEF3C7), // Light amber
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.wifi_off_rounded,
+                  color: Color(0xFFD97706), // Amber
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'WiFi Kantor Belum Sesuai',
+                      style: AppTypography.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isCheckOut ? 'Verifikasi Check Out WFO' : 'Verifikasi Absensi WFO',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Subtitle Message
+          Text(
+            errorMsg ??
+                'Untuk menggunakan scan NFC, perangkat Anda harus terhubung ke salah satu jaringan WiFi Kantor resmi.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[600],
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Card Detail
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[200]!, width: 1.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // WiFi Terdeteksi
+                Row(
+                  children: [
+                    Icon(
+                      detectedSsid != null && detectedSsid!.isNotEmpty
+                          ? Icons.wifi_rounded
+                          : Icons.wifi_off_rounded,
+                      size: 18,
+                      color: detectedSsid != null && detectedSsid!.isNotEmpty
+                          ? const Color(0xFFD97706)
+                          : Colors.red[400],
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'WiFi Terdeteksi Perangkat:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.only(left: 26),
+                  child: Text(
+                    (detectedSsid != null && detectedSsid!.isNotEmpty)
+                        ? '"$detectedSsid"'
+                        : '(Tidak Terdeteksi / Izin Lokasi Matikan)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: (detectedSsid != null && detectedSsid!.isNotEmpty)
+                          ? Colors.black87
+                          : Colors.red[600],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Divider(height: 1, color: Colors.grey[200]),
+                const SizedBox(height: 14),
+
+                // WiFi Kantor Terdaftar
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.business_rounded,
+                      size: 18,
+                      color: Color(0xFF2563EB),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'WiFi Kantor Terdaftar:',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.only(left: 26),
+                  child: officeSsids.isNotEmpty
+                      ? Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: officeSsids.map((ssid) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: const Color(0xFFBFDBFE),
+                                ),
+                              ),
+                              child: Text(
+                                ssid,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1D4ED8),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        )
+                      : Text(
+                          '-',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Action Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Mengerti',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
