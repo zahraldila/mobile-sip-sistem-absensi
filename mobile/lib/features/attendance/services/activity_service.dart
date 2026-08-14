@@ -279,19 +279,19 @@ class ActivityService extends ChangeNotifier {
     if (normalized.contains('foto profil')) {
       return ActivityItemData.info(
         id: id,
-        title: aktivitas,
-        subtitle: 'Log aktivitas akun Anda',
+        title: 'Foto Profil Diperbarui',
+        subtitle: aktivitas,
         timeText: timeText,
         status: 'Diperbarui',
         createdAt: createdAt,
       );
     }
 
-    if (normalized.contains('update data profil') || normalized.contains('profil')) {
+    if (normalized.contains('update data profil') || normalized.contains('profil') || normalized.contains('kontak')) {
       return ActivityItemData.info(
         id: id,
-        title: aktivitas,
-        subtitle: 'Log aktivitas akun Anda',
+        title: 'Profil Diperbarui',
+        subtitle: aktivitas,
         timeText: timeText,
         status: 'Diperbarui',
         createdAt: createdAt,

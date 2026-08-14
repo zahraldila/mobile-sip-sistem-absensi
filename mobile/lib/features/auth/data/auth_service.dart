@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
 import 'package:sip_sistem_absensi_mobile/core/services/audit_log_service.dart';
+import 'package:sip_sistem_absensi_mobile/features/attendance/services/activity_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import '../domain/entities/auth_user.dart';
 import '../services/auth_session_service.dart';
@@ -349,8 +350,11 @@ class AuthService {
       }
 
       if (success) {
-        // Catat ke audit_log
-        AuditLogService.instance.log('update data profil');
+        // Catat ke audit_log & ActivityService
+        final aktivitas = await AuditLogService.instance.log('Update data profil');
+        if (aktivitas != null) {
+          ActivityService.instance.recordAuditActivity(aktivitas);
+        }
       }
 
       return success;
