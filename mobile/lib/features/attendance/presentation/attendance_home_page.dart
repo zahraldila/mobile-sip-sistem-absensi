@@ -15,6 +15,8 @@ import 'package:sip_sistem_absensi_mobile/features/attendance/services/attendanc
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:sip_sistem_absensi_mobile/core/widgets/success_dialog.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:sip_sistem_absensi_mobile/features/notification/data/notification_service.dart';
+import 'package:sip_sistem_absensi_mobile/features/notification/services/notification_read_service.dart';
 
 class AttendanceHomePage extends StatefulWidget {
   const AttendanceHomePage({super.key});
@@ -1742,8 +1744,44 @@ class ActivityItem extends StatelessWidget {
   }
 }
 
-class NotificationButton extends StatelessWidget {
+class NotificationButton extends StatefulWidget {
   const NotificationButton({super.key});
+
+  @override
+  State<NotificationButton> createState() => _NotificationButtonState();
+}
+
+class _NotificationButtonState extends State<NotificationButton> {
+  bool _hasUnread = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkUnreadStatus();
+  }
+
+  Future<void> _checkUnreadStatus() async {
+    final user = AuthState.instance.currentUser;
+    final pegawaiId = user?.pegawaiId ?? '';
+    if (pegawaiId.isEmpty) return;
+
+    try {
+      final service = NotificationService();
+      final readService = NotificationReadService();
+      final list = await service.fetchNotifications(pegawaiId);
+      if (list.isEmpty) {
+        if (mounted) setState(() => _hasUnread = false);
+        return;
+      }
+
+      final ids = list.map((n) => n.notifikasiId).toList();
+      final statuses = await readService.fetchReadStatuses(ids);
+      final hasUnread = list.any((n) => statuses[n.notifikasiId] != true);
+      if (mounted) {
+        setState(() => _hasUnread = hasUnread);
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1753,10 +1791,43 @@ class NotificationButton extends StatelessWidget {
       elevation: 0,
       child: InkWell(
         customBorder: const CircleBorder(),
-        onTap: () => context.push('/notifications'),
-        child: const Padding(
-          padding: EdgeInsets.all(14),
-          child: Icon(Icons.notifications_none, color: AppColors.textBlack, size: 24),
+        onTap: () async {
+          await context.push('/notifications');
+          _checkUnreadStatus();
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Icon(
+                Icons.notifications_outlined,
+                color: AppColors.textBlack,
+                size: 24,
+              ),
+              if (_hasUnread)
+                Positioned(
+                  top: 1,
+                  right: 2,
+                  child: Container(
+                    width: 8.5,
+                    height: 8.5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1.5),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x33EF4444),
+                          blurRadius: 3,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
