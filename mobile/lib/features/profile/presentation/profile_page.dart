@@ -766,25 +766,7 @@ Positioned(
                   onPressed: () async {
                     final confirm = await showDialog<bool>(
                       context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Log Out'),
-                        content: const Text(
-                          'Apakah Anda yakin ingin keluar dari akun ini?',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(false),
-                            child: const Text('Batal'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(true),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.redAccent,
-                            ),
-                            child: const Text('Keluar'),
-                          ),
-                        ],
-                      ),
+                      builder: (context) => const _LogoutConfirmationDialog(),
                     );
 
                     if (confirm == true) {
@@ -925,6 +907,112 @@ Positioned(
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Dialog Konfirmasi Log Out modern yang persis sesuai desain mockup
+class _LogoutConfirmationDialog extends StatelessWidget {
+  const _LogoutConfirmationDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      elevation: 8,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Ikon Segitiga Peringatan Merah Presisi
+            Container(
+              width: 100,
+              height: 90,
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.warning_rounded,
+                size: 96,
+                color: Color(0xFFFF3B30),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Judul Pertanyaan
+            const Text(
+              'Apakah anda yakin akan logout?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1F2937),
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 28),
+
+            // Tombol Aksi (Tidak & Ya)
+            Row(
+              children: [
+                // Tombol Tidak
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFFE4E6),
+                        foregroundColor: const Color(0xFFE11D48),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'Tidak',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+
+                // Tombol Ya
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFD3949),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const Text(
+                        'Ya',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
