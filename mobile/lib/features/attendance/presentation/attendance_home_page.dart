@@ -447,7 +447,93 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
     );
   }
 
-  void _triggerNfcCheckOut(String pegawaiId, {String? reason}) {
+  Future<bool> _verifyWiFiBeforeNfc() async {
+    BuildContext? dialogContext;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        dialogContext = ctx;
+        return const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        );
+      },
+    );
+
+    await Future.delayed(const Duration(milliseconds: 100));
+
+    try {
+      try {
+        final status = await Permission.location.status;
+        if (status.isDenied) {
+          await Permission.location.request();
+        }
+      } catch (pe) {
+        debugPrint('[AttendanceHomePage] Error requesting location permission: $pe');
+      }
+
+      final officeWiFis = await _attendanceService.fetchActiveOfficeWiFi();
+      final info = NetworkInfo();
+      String? currentSsid;
+      try {
+        currentSsid = await info.getWifiName();
+        if (currentSsid != null) {
+          currentSsid = currentSsid.trim().replaceAll('"', '').replaceAll("'", "");
+        }
+      } catch (e) {
+        debugPrint('[AttendanceHomePage] Error reading WiFi SSID: $e');
+      }
+
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.pop(dialogContext!);
+      }
+
+      final officeSsids = officeWiFis
+          .map((w) => w['ssid']?.toString().trim().replaceAll('"', '').replaceAll("'", "") ?? '')
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      bool isMatched = false;
+      if (currentSsid != null && currentSsid.isNotEmpty && currentSsid != '<unknown ssid>') {
+        isMatched = officeSsids.any((officeSsid) =>
+            officeSsid.toLowerCase() == currentSsid!.toLowerCase());
+      }
+
+      if (isMatched) {
+        return true;
+      } else {
+        if (mounted) {
+          _showWiFiFailureDialog(
+            pegawaiId: '',
+            detectedSsid: currentSsid,
+            officeSsids: officeSsids,
+            errorMsg: 'Untuk menggunakan scan NFC, perangkat Anda harus terhubung ke WiFi Kantor terlebih dahulu.',
+          );
+        }
+        return false;
+      }
+    } catch (e) {
+      if (dialogContext != null && dialogContext!.mounted) {
+        Navigator.pop(dialogContext!);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal memeriksa jaringan WiFi: $e'),
+            backgroundColor: AppColors.danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
+  void _triggerNfcCheckOut(String pegawaiId, {String? reason}) async {
+    final wifiValid = await _verifyWiFiBeforeNfc();
+    if (!wifiValid) return;
+
+    if (!mounted) return;
     NfcTapDialog.show(
       context,
       isCheckOut: true,
@@ -651,7 +737,11 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
   }
 
   /// Menjalankan Check In WFO menggunakan sensor/simulasi NFC secara aman.
-  void _triggerNfcCheckIn(String pegawaiId) {
+  void _triggerNfcCheckIn(String pegawaiId) async {
+    final wifiValid = await _verifyWiFiBeforeNfc();
+    if (!wifiValid) return;
+
+    if (!mounted) return;
     NfcTapDialog.show(
       context,
       isCheckOut: false,
