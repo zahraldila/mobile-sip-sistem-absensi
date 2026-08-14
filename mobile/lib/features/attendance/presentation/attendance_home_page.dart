@@ -1294,32 +1294,6 @@ class AttendanceStatusCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    // Jika sudah check-in tampilkan pill metode (hijau) seperti mockup
-                    if (isCheckedIn && !isAlreadyCheckedOut) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE6F8EE),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.verified, size: 16, color: Color(0xFF27AE60)),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Metode: $attendanceMethod',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF27AE60),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                     Row(
                       children: [
                         const Icon(
