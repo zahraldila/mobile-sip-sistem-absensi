@@ -193,7 +193,7 @@ class _CheckOutPageState extends State<CheckOutPage> {
                           color: AppColors.primary.withAlpha(25),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.edit_note_rounded,
+                        child: Icon(Icons.edit_note_rounded,
                             color: AppColors.primary, size: 22),
                       ),
                       const SizedBox(width: AppSpacing.sm),
@@ -247,7 +247,7 @@ class _CheckOutPageState extends State<CheckOutPage> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: AppRadius.medium,
-                        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                        borderSide: BorderSide(color: AppColors.primary, width: 1.5),
                       ),
                       contentPadding: const EdgeInsets.all(AppSpacing.md),
                     ),

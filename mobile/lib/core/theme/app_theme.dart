@@ -42,7 +42,7 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
-          side: const BorderSide(color: AppColors.primary, width: 1.5),
+          side: BorderSide(color: AppColors.primary, width: 1.5),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           textStyle: AppTypography.textTheme.labelLarge?.copyWith(color: AppColors.primary),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),

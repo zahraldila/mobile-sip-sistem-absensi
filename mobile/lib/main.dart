@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:sip_sistem_absensi_mobile/app_router.dart';
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
+import 'package:sip_sistem_absensi_mobile/core/services/app_settings_service.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_theme.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
@@ -14,6 +15,7 @@ Future<void> main() async {
   );
   debugPrint('[Supabase] Base URL=${SupabaseConfig.url}');
   await initializeDateFormatting('id', null);
+  await AppSettingsService.instance.initialize();
   await AuthState.instance.initialize();
   runApp(const SipSistemAbsensiApp());
 }
@@ -23,11 +25,16 @@ class SipSistemAbsensiApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'SIP Sistem Absensi',
-      theme: AppTheme.light(),
-      routerConfig: AppRouter.router,
-      debugShowCheckedModeBanner: false,
+    return ListenableBuilder(
+      listenable: AppSettingsService.instance,
+      builder: (context, _) {
+        return MaterialApp.router(
+          title: AppSettingsService.instance.companyName,
+          theme: AppTheme.light(),
+          routerConfig: AppRouter.router,
+          debugShowCheckedModeBanner: false,
+        );
+      },
     );
   }
 }

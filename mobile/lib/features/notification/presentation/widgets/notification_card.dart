@@ -35,7 +35,7 @@ class NotificationCard extends StatelessWidget {
 
   final VoidCallback onTap;
 
-  static const Color _dotUnread = Color(0xFF2563EB); // AppColors.primary
+  static Color get _dotUnread => AppColors.primary;
 
   @override
   Widget build(BuildContext context) {
@@ -105,7 +105,7 @@ class NotificationCard extends StatelessWidget {
                         Container(
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             color: _dotUnread,
                             shape: BoxShape.circle,
                           ),

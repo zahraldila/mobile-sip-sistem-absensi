@@ -60,7 +60,10 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
       lastDate: DateTime.now().add(const Duration(days: 365)),
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
-          colorScheme: ColorScheme.fromSwatch(primarySwatch: Colors.blue).copyWith(onPrimary: Colors.white),
+          colorScheme: Theme.of(context).colorScheme.copyWith(
+            primary: AppColors.primary,
+            onPrimary: Colors.white,
+          ),
         ),
         child: child!,
       ),

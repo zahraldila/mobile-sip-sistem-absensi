@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:sip_sistem_absensi_mobile/core/services/app_settings_service.dart';
 
 class AppColors {
   AppColors._();
 
-  static const Color primary = Color(0xFF2563EB);
-  static const Color secondary = Color(0xFF3B82F6);
+  static Color get primary => AppSettingsService.instance.primaryColor;
+  static Color get secondary => AppSettingsService.instance.secondaryColor;
   static const Color success = Color(0xFF22C55E);
   static const Color warning = Color(0xFFF59E0B);
   static const Color danger = Color(0xFFEF4444);
@@ -23,7 +24,7 @@ class AppColors {
   // Warna dari figma
   static const Color cardBackground = Color(0xFFFEFEFE);
   static const Color cardBorder = Color(0xAD95C1CC);
-  static const Color navActive = Color(0xFF1732AC);
+  static Color get navActive => AppSettingsService.instance.navActiveColor;
   static const Color greeting = Color(0xFF8A8A8A);
   static const Color labelMuted = Color(0x8C000000);
   static const Color textMuted = Color(0x80000000);

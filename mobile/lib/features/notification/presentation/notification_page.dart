@@ -201,7 +201,7 @@ class _NotificationPageState extends State<NotificationPage> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(
+      return Center(
         child: CircularProgressIndicator(color: AppColors.primary),
       );
     }

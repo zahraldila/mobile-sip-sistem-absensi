@@ -11,17 +11,18 @@ class StatusCard extends StatelessWidget {
     required this.value,
     this.subtitle,
     this.icon,
-    this.color = AppColors.primary,
+    this.color,
   });
 
   final String title;
   final String value;
   final String? subtitle;
   final Widget? icon;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor = color ?? AppColors.primary;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -36,9 +37,9 @@ class StatusCard extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Color.fromRGBO(
-                  (color.r * 255).round(),
-                  (color.g * 255).round(),
-                  (color.b * 255).round(),
+                  (effectiveColor.r * 255).round(),
+                  (effectiveColor.g * 255).round(),
+                  (effectiveColor.b * 255).round(),
                   0.12,
                 ),
                 borderRadius: AppRadius.medium,

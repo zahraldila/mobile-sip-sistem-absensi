@@ -7,18 +7,18 @@ class CustomFab extends StatelessWidget {
     super.key,
     required this.onPressed,
     required this.icon,
-    this.backgroundColor = AppColors.primary,
+    this.backgroundColor,
   });
 
   final VoidCallback onPressed;
   final Widget icon;
-  final Color backgroundColor;
+  final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
     return FloatingActionButton(
       onPressed: onPressed,
-      backgroundColor: backgroundColor,
+      backgroundColor: backgroundColor ?? AppColors.primary,
       shape: RoundedRectangleBorder(borderRadius: AppRadius.medium),
       elevation: 8,
       child: icon,

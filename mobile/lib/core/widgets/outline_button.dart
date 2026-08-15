@@ -39,7 +39,7 @@ class OutlineButton extends StatelessWidget {
       child: OutlinedButton(
         onPressed: isEnabled ? onPressed : null,
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: AppColors.primary, width: 1.5),
+          side: BorderSide(color: AppColors.primary, width: 1.5),
           foregroundColor: AppColors.primary,
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.md),
           shape: RoundedRectangleBorder(borderRadius: AppRadius.medium),

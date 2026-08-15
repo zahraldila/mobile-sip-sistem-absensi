@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
+import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 
 /// Model untuk merepresentasikan item aktivitas pengguna.
@@ -118,12 +119,12 @@ class ActivityItemData {
       subtitle: subtitle,
       timeText: timeText,
       statusLabel: status,
-      statusColor: const Color(0xFF2F80ED),
-      statusBgColor: const Color(0xFFEBF4FE),
+      statusColor: AppColors.primary,
+      statusBgColor: AppColors.primary.withValues(alpha: 0.08),
       icon: Icons.info_outline_rounded,
-      iconColor: const Color(0xFF2F80ED),
-      iconBgColor: const Color(0xFFE0F0FC),
-      timePillBgColor: const Color(0xFFE2F0FA),
+      iconColor: AppColors.primary,
+      iconBgColor: AppColors.primary.withValues(alpha: 0.12),
+      timePillBgColor: AppColors.primary.withValues(alpha: 0.1),
       createdAt: createdAt ?? DateTime.now(),
     );
   }

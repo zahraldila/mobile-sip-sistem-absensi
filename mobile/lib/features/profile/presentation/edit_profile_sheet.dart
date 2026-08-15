@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 
 class EditProfileSheet extends StatefulWidget {
   final String currentEmail;
@@ -176,7 +177,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
               child: ElevatedButton(
                 onPressed: _save,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(

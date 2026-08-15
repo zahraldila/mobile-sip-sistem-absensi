@@ -403,7 +403,7 @@ class _StepCard extends StatelessWidget {
     required this.actionLabel,
     required this.successText,
     required this.loadingText,
-    this.accentColor = AppColors.primary,
+    this.accentColor,
     this.previewWidget,
   });
 
@@ -416,7 +416,7 @@ class _StepCard extends StatelessWidget {
   final String actionLabel;
   final String successText;
   final String loadingText;
-  final Color accentColor;
+  final Color? accentColor;
   final Widget? previewWidget;
 
   Color get _statusColor {
@@ -434,6 +434,7 @@ class _StepCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveAccentColor = accentColor ?? AppColors.primary;
     final isLoading = status == _DetectionStatus.loading;
     final isSuccess = status == _DetectionStatus.success;
 
@@ -464,7 +465,7 @@ class _StepCard extends StatelessWidget {
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
-                  color: isSuccess ? AppColors.success : accentColor,
+                  color: isSuccess ? AppColors.success : effectiveAccentColor,
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,

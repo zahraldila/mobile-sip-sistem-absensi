@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 
 class LoginPage extends StatefulWidget {
@@ -189,8 +190,8 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(14),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF2563EB),
+                                  borderSide: BorderSide(
+                                    color: AppColors.primary,
                                     width: 2.0,
                                   ),
                                 ),
@@ -274,8 +275,8 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(14),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF2563EB),
+                                  borderSide: BorderSide(
+                                    color: AppColors.primary,
                                     width: 2.0,
                                   ),
                                 ),
@@ -332,7 +333,7 @@ class _LoginPageState extends State<LoginPage> {
                                             color: Color(0xFF64748B),
                                             width: 1.5,
                                           ),
-                                          activeColor: const Color(0xFF2563EB),
+                                          activeColor: AppColors.primary,
                                           materialTapTargetSize:
                                               MaterialTapTargetSize.shrinkWrap,
                                           visualDensity: VisualDensity.compact,
@@ -360,7 +361,7 @@ class _LoginPageState extends State<LoginPage> {
                                     style: GoogleFonts.plusJakartaSans(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,
-                                      color: const Color(0xFF1D4ED8),
+                                      color: AppColors.primary,
                                     ),
                                   ),
                                 ),
@@ -373,13 +374,13 @@ class _LoginPageState extends State<LoginPage> {
                               child: ElevatedButton(
                                 onPressed: _isLoading ? null : _handleLogin,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF2F70F2),
+                                  backgroundColor: AppColors.primary,
                                   foregroundColor: Colors.white,
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  disabledBackgroundColor: const Color(0xFF93C5FD),
+                                  disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
                                 ),
                                 child: _isLoading
                                     ? const SizedBox(
@@ -414,7 +415,7 @@ class _LoginPageState extends State<LoginPage> {
                                     TextSpan(
                                       text: 'Hubungi IT Support',
                                       style: GoogleFonts.plusJakartaSans(
-                                        color: const Color(0xFF1D4ED8),
+                                        color: AppColors.primary,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),

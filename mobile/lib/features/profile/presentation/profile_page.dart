@@ -10,6 +10,7 @@ import '../../auth/domain/entities/auth_user.dart';
 import '../../auth/services/auth_state.dart';
 import '../services/profile_photo_service.dart';
 import '../../attendance/services/attendance_service.dart';
+import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'edit_profile_sheet.dart';
 import 'success_sheet.dart';
 
@@ -335,7 +336,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   icon: const Icon(Icons.refresh),
                   label: const Text('Coba Lagi'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -527,9 +528,9 @@ Positioned(
                             color: const Color(0xFFEFF6FF),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.person_outline,
-                            color: Color(0xFF2563EB),
+                            color: AppColors.primary,
                             size: 20,
                           ),
                         ),

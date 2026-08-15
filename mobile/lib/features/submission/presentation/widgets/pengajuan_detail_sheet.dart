@@ -260,7 +260,7 @@ class _AttachmentCard extends StatelessWidget {
                 color: AppColors.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(Icons.picture_as_pdf, color: AppColors.primary, size: 24),
+              child: Icon(Icons.picture_as_pdf, color: AppColors.primary, size: 24),
             ),
             const SizedBox(width: 12),
             Expanded(

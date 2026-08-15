@@ -159,7 +159,7 @@ class _NfcTapDialogState extends State<NfcTapDialog> {
                     ),
                     const SizedBox(height: 12),
                     if (_isScanning)
-                      const CircularProgressIndicator(color: AppColors.primary)
+                      CircularProgressIndicator(color: AppColors.primary)
                     else if (_errorMessage != null)
                       TextButton.icon(
                         onPressed: _startScan,

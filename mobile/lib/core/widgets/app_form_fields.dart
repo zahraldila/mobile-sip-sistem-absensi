@@ -85,7 +85,7 @@ class AppDropdownField<T> extends StatelessWidget {
               fillColor: AppColors.surface,
               contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
               border: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: const BorderSide(color: AppColors.border)),
-              focusedBorder: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+              focusedBorder: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: BorderSide(color: AppColors.primary, width: 1.5)),
               enabledBorder: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: const BorderSide(color: AppColors.border)),
               errorText: fieldState.errorText,
               hintStyle: AppTypography.textTheme.bodyMedium?.copyWith(color: AppColors.textDisabled),
@@ -145,7 +145,7 @@ class AppDateField extends StatelessWidget {
                 fillColor: AppColors.surface,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                 border: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: const BorderSide(color: AppColors.border)),
-                focusedBorder: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+                focusedBorder: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: BorderSide(color: AppColors.primary, width: 1.5)),
                 enabledBorder: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: const BorderSide(color: AppColors.border)),
               ),
               child: Text(
@@ -197,7 +197,7 @@ class AppUploadField extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.upload_file, color: AppColors.primary),
+                Icon(Icons.upload_file, color: AppColors.primary),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -240,7 +240,7 @@ class AppMultilineField extends StatelessWidget {
         fillColor: AppColors.surface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         border: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: const BorderSide(color: AppColors.border)),
-        focusedBorder: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+        focusedBorder: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: BorderSide(color: AppColors.primary, width: 1.5)),
         enabledBorder: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: const BorderSide(color: AppColors.border)),
       ),
     );

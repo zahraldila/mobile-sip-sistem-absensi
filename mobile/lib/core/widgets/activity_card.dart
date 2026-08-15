@@ -11,17 +11,19 @@ class ActivityCard extends StatelessWidget {
     required this.subtitle,
     required this.status,
     this.icon,
-    this.statusColor = AppColors.primary,
+    this.statusColor,
   });
 
   final String title;
   final String subtitle;
   final String status;
   final Widget? icon;
-  final Color statusColor;
+  final Color? statusColor;
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor = statusColor ?? AppColors.primary;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -31,22 +33,21 @@ class ActivityCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          if (icon != null)
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceAlt,
-                borderRadius: AppRadius.medium,
-              ),
-              child: icon,
-            ),
-          if (icon != null) const SizedBox(width: 16),
+          if (icon != null) ...[
+            icon!,
+            const SizedBox(width: 14),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: AppTypography.textTheme.titleMedium),
-                const SizedBox(height: 6),
+                Text(
+                  title,
+                  style: AppTypography.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
                 Text(subtitle, style: AppTypography.textTheme.bodySmall),
               ],
             ),
@@ -56,14 +57,14 @@ class ActivityCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
               color: Color.fromRGBO(
-                (statusColor.r * 255).round(),
-                (statusColor.g * 255).round(),
-                (statusColor.b * 255).round(),
+                (effectiveColor.r * 255).round(),
+                (effectiveColor.g * 255).round(),
+                (effectiveColor.b * 255).round(),
                 0.12,
               ),
               borderRadius: AppRadius.pill,
             ),
-            child: Text(status, style: AppTypography.textTheme.labelSmall?.copyWith(color: statusColor)),
+            child: Text(status, style: AppTypography.textTheme.labelSmall?.copyWith(color: effectiveColor)),
           ),
         ],
       ),

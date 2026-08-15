@@ -15,6 +15,7 @@ import 'package:sip_sistem_absensi_mobile/features/attendance/services/attendanc
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:sip_sistem_absensi_mobile/core/widgets/success_dialog.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:sip_sistem_absensi_mobile/core/services/app_settings_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/notification/data/notification_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/notification/services/notification_read_service.dart';
 
@@ -87,8 +88,11 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       return;
     }
 
-    // Ambil data aktivitas terbaru secara riil dari database
-    await ActivityService.instance.loadActivitiesFromDatabase();
+    // Ambil data aktivitas terbaru dan branding settings dari database
+    await Future.wait([
+      ActivityService.instance.loadActivitiesFromDatabase(),
+      AppSettingsService.instance.fetchSettings(),
+    ]);
 
     // 1. Ambil Jadwal Kerja Aktif Hari Ini
     final schedule = await _attendanceService.fetchTodaySchedule();
@@ -316,7 +320,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
                         color: const Color(0xFFEFF6FF),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.nfc, color: Color(0xFF1E60F2)),
+                      child: Icon(Icons.nfc, color: AppColors.primary),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -456,7 +460,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       barrierDismissible: false,
       builder: (ctx) {
         dialogContext = ctx;
-        return const Center(
+        return Center(
           child: CircularProgressIndicator(color: AppColors.primary),
         );
       },
@@ -559,7 +563,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       barrierDismissible: false,
       builder: (ctx) {
         dialogContext = ctx;
-        return const Center(
+        return Center(
           child: CircularProgressIndicator(color: AppColors.primary),
         );
       },
@@ -672,7 +676,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       barrierDismissible: false,
       builder: (ctx) {
         dialogContext = ctx;
-        return const Center(
+        return Center(
           child: CircularProgressIndicator(color: AppColors.primary),
         );
       },
@@ -808,7 +812,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       barrierDismissible: false,
       builder: (ctx) {
         dialogContext = ctx;
-        return const Center(
+        return Center(
           child: CircularProgressIndicator(color: AppColors.primary),
         );
       },
@@ -919,7 +923,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       barrierDismissible: false,
       builder: (ctx) {
         dialogContext = ctx;
-        return const Center(
+        return Center(
           child: CircularProgressIndicator(color: AppColors.primary),
         );
       },
@@ -1056,7 +1060,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
             children: [
               if (isLoading) ...[
                 const SizedBox(height: 200),
-                const Center(
+                Center(
                   child: CircularProgressIndicator(color: AppColors.primary),
                 ),
               ] else ...[
@@ -1467,7 +1471,7 @@ class AttendanceStatusCard extends StatelessWidget {
                 ElevatedButton(
                   onPressed: onActionPressed,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1E60F2),
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -2556,7 +2560,7 @@ class _EarlyCheckOutSheetState extends State<EarlyCheckOutSheet> {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       elevation: 0,
@@ -2805,7 +2809,7 @@ class WiFiFailureSheet extends StatelessWidget {
             child: ElevatedButton(
               onPressed: () => Navigator.pop(context),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2563EB),
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 elevation: 0,
