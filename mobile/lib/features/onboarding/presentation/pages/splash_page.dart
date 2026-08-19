@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:sip_sistem_absensi_mobile/core/config/supabase_config.dart';
 import 'package:sip_sistem_absensi_mobile/core/services/app_settings_service.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
@@ -85,10 +86,15 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
   }
 
   Widget _buildLogo(String logoPath) {
+    final trimmed = logoPath.trim();
+    if (trimmed.isEmpty) {
+      return _buildFallbackLogo();
+    }
+
     // 1. Jika berupa URL lengkap (HTTP / HTTPS)
-    if (logoPath.startsWith('http://') || logoPath.startsWith('https://')) {
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       return Image.network(
-        logoPath,
+        trimmed,
         width: 120,
         height: 120,
         fit: BoxFit.contain,
@@ -96,22 +102,10 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
       );
     }
 
-    // 2. Jika berupa path Supabase Storage atau path relatif (misal: 'images/logo-sip.png')
-    if (logoPath.isNotEmpty && !logoPath.startsWith('assets/')) {
-      final storageUrl = '${SupabaseConfig.url}/storage/v1/object/public/$logoPath';
-      return Image.network(
-        storageUrl,
-        width: 120,
-        height: 120,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) => _buildFallbackLogo(),
-      );
-    }
-
-    // 3. Jika berupa asset lokal yang valid
-    if (logoPath.startsWith('assets/')) {
+    // 2. Jika berupa asset lokal yang valid
+    if (trimmed.startsWith('assets/')) {
       return Image.asset(
-        logoPath,
+        trimmed,
         width: 120,
         height: 120,
         fit: BoxFit.contain,
@@ -119,7 +113,19 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
       );
     }
 
-    return _buildFallbackLogo();
+    // 3. Jika berupa path Supabase Storage atau path relatif (misal: 'images/logo-sip.png')
+    final cleanPath = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
+    final storageUrl = cleanPath.startsWith('storage/v1/object/public/')
+        ? '${SupabaseConfig.url}/$cleanPath'
+        : '${SupabaseConfig.url}/storage/v1/object/public/$cleanPath';
+
+    return Image.network(
+      storageUrl,
+      width: 120,
+      height: 120,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) => _buildFallbackLogo(),
+    );
   }
 
   Widget _buildFallbackLogo() {
