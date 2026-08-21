@@ -214,6 +214,13 @@ class _LoginPageState extends State<LoginPage> {
                                 if (value == null || value.trim().isEmpty) {
                                   return 'Email atau username tidak boleh kosong';
                                 }
+                                if (value.contains('@')) {
+                                  final emailRegex = RegExp(
+                                      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+                                  if (!emailRegex.hasMatch(value)) {
+                                    return 'Format email tidak valid.';
+                                  }
+                                }
                                 return null;
                               },
                             ),
