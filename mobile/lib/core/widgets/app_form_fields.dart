@@ -210,6 +210,11 @@ class AppUploadField extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 6),
+        Text(
+          'Format file yang diperbolehkan: PDF/JPG',
+          style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+        ),
       ],
     );
   }
