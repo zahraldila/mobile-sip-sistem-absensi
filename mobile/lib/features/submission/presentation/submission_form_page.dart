@@ -28,7 +28,7 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
   final _formKey = GlobalKey<FormState>();
   final _keteranganController = TextEditingController();
   String? _selectedJenis;
-  final List<DateTime> _tanggalList = [DateTime.now()];
+  final List<DateTime?> _tanggalList = [null];
   String? _selectedFileName;
   XFile? _selectedFile;
   bool _isSubmitting = false;
@@ -52,7 +52,7 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
   String _formatDisplayDate(DateTime date) => DateFormat('d MMMM yyyy', 'id_ID').format(date);
 
   Future<void> _pickDate(int index) async {
-    final currentDate = _tanggalList[index];
+    final currentDate = _tanggalList[index] ?? DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: currentDate,
@@ -70,18 +70,21 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
     );
 
     if (picked == null) return;
-    if (_tanggalList.any((date) => date.isAtSameMomentAs(picked))) return;
+    if (_tanggalList.any((date) => date != null && date.isAtSameMomentAs(picked))) return;
 
     setState(() {
       _tanggalList[index] = picked;
-      _tanggalList.sort();
+      _tanggalList.sort((a, b) {
+        if (a == null) return 1;
+        if (b == null) return -1;
+        return a.compareTo(b);
+      });
     });
   }
 
   void _addDateRow() {
     setState(() {
-      _tanggalList.add(DateTime.now().add(Duration(days: _tanggalList.length)));
-      _tanggalList.sort();
+      _tanggalList.add(null);
     });
   }
 
@@ -133,6 +136,10 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
   Future<void> _submit() async {
     if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
+    if (_tanggalList.any((d) => d == null)) {
+      _showError('Tanggal wajib diisi sebelum mengirim pengajuan.');
+      return;
+    }
     final user = AuthState.instance.currentUser;
     if (user == null) {
       _showError('Session tidak ditemukan. Silakan login ulang.');
@@ -171,7 +178,7 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
       final request = PengajuanRequest(
         pegawaiId: user.pegawaiId,
         jenisPengajuan: _selectedJenis ?? '',
-        tanggalPengajuan: List.unmodifiable(_tanggalList),
+        tanggalPengajuan: List.unmodifiable(_tanggalList.whereType<DateTime>().toList()),
         lampiran: uploadedPath ?? _selectedFileName,
         keterangan: _keteranganController.text.isEmpty ? null : _keteranganController.text.trim(),
       );
@@ -273,11 +280,12 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
                     padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                     child: AppDateField(
                       label: null,
-                      value: _formatDisplayDate(date),
+                      value: date != null ? _formatDisplayDate(date) : null,
+                      hint: 'Pilih tanggal',
                       onTap: () => _pickDate(index),
                       validator: (_) {
-                        if (_tanggalList.isEmpty) {
-                          return 'Minimal harus ada 1 tanggal';
+                        if (date == null) {
+                          return 'Tanggal wajib diisi';
                         }
                         return null;
                       },

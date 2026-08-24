@@ -138,6 +138,7 @@ class AppDateField extends StatelessWidget {
             onTap: onTap,
             borderRadius: AppRadius.medium,
             child: InputDecorator(
+              isEmpty: value == null || value!.isEmpty,
               decoration: InputDecoration(
                 labelText: label,
                 hintText: hint,
