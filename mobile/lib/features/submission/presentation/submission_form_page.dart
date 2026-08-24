@@ -295,6 +295,14 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
                   hint: 'Unggah file yang berkaitan',
                   fileName: _selectedFileName,
                   onTap: _pickFile,
+                  onRemove: _selectedFileName != null
+                      ? () {
+                          setState(() {
+                            _selectedFile = null;
+                            _selectedFileName = null;
+                          });
+                        }
+                      : null,
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 AppMultilineField(
