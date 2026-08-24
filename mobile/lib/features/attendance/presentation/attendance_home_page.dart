@@ -473,7 +473,42 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         },
         onWiFiSelected: () {
           Navigator.pop(context);
-          _triggerWiFiCheckOut(pegawaiId, reason: reason);
+          // Tampilkan modal konfirmasi untuk WFO via WiFi
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.large),
+              title: Text(
+                'Konfirmasi',
+                style: AppTypography.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              content: Text(
+                'Yakin ingin melakukan Check Out?',
+                style: AppTypography.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _triggerWiFiCheckOut(pegawaiId, reason: reason);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(borderRadius: AppRadius.medium),
+                  ),
+                  child: const Text('Yakin'),
+                ),
+              ],
+            ),
+          );
         },
       ),
     );
@@ -757,6 +792,35 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         Navigator.pop(dialogContext!);
       }
       if (mounted) {
+        final errorStr = e.toString().toLowerCase();
+        if (errorStr.contains('socketexception') || errorStr.contains('failed host lookup') || errorStr.contains('connection error')) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.large),
+              title: Text(
+                'Tidak Ada Koneksi',
+                style: AppTypography.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              content: Text(
+                'Sambungkan ke internet untuk melakukan Check Out.',
+                style: AppTypography.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Tutup'),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Gagal mencatat Check Out: $e'),

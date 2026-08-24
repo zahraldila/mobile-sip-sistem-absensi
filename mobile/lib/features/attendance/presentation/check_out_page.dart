@@ -49,6 +49,44 @@ class _CheckOutPageState extends State<CheckOutPage> {
     });
   }
 
+  void _confirmCheckOut() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.large),
+        title: Text(
+          'Konfirmasi',
+          style: AppTypography.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Text(
+          'Yakin ingin melakukan Check Out?',
+          style: AppTypography.textTheme.bodyMedium?.copyWith(
+            color: AppColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _submitCheckOut();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.medium),
+            ),
+            child: const Text('Yakin'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _submitCheckOut() async {
     final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
     setState(() => _isSubmitting = true);
@@ -65,6 +103,36 @@ class _CheckOutPageState extends State<CheckOutPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
+      
+      final errorStr = e.toString().toLowerCase();
+      if (errorStr.contains('socketexception') || errorStr.contains('failed host lookup') || errorStr.contains('connection error')) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: AppRadius.large),
+            title: Text(
+              'Tidak Ada Koneksi',
+              style: AppTypography.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            content: Text(
+              'Sambungkan ke internet untuk melakukan Check Out.',
+              style: AppTypography.textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Tutup'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Gagal melakukan Check Out: $e'),
@@ -261,7 +329,7 @@ class _CheckOutPageState extends State<CheckOutPage> {
             SizedBox(
               height: 52,
               child: ElevatedButton.icon(
-                onPressed: _isSubmitting ? null : _submitCheckOut,
+                onPressed: _isSubmitting ? null : _confirmCheckOut,
                 icon: _isSubmitting
                     ? const SizedBox(
                         width: 20,
