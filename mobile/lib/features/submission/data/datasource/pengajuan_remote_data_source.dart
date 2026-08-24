@@ -92,11 +92,12 @@ class PengajuanRemoteDataSource {
         }));
 
     if (resp.statusCode == 201 || resp.statusCode == 204) {
-      // Catat ke audit_log
-      final aktivitas = await AuditLogService.instance.log('Membuat pengajuan ${request.jenisPengajuan}');
-      if (aktivitas != null) {
-        ActivityService.instance.recordAuditActivity(aktivitas);
-      }
+      // Catat ke audit_log secara fire-and-forget agar tidak memblokir UI
+      AuditLogService.instance.log('Membuat pengajuan ${request.jenisPengajuan}').then((aktivitas) {
+        if (aktivitas != null) {
+          ActivityService.instance.recordAuditActivity(aktivitas);
+        }
+      });
       return;
     }
 
