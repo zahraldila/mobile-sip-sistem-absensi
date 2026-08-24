@@ -604,15 +604,32 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
     NfcTapDialog.show(
       context,
       isCheckOut: true,
-      onSuccess: (nfcUid) async {
-        final isValid = await _validateNfc(pegawaiId, nfcUid);
-        if (!isValid) return;
-        await _performWfoCheckOut(
-          pegawaiId,
-          method: 'Sensor NFC',
-          reason: reason,
-          nfcUid: nfcUid,
-        );
+      onValidateAndSubmit: (nfcUid) async {
+        try {
+          final isValid = await _attendanceService.validateNfcForPegawai(
+            pegawaiId: pegawaiId,
+            uid: nfcUid,
+          );
+          if (!isValid) {
+            return 'Kartu NFC tidak terdaftar untuk akun Anda. Silakan gunakan kartu terdaftar.';
+          }
+          await _performWfoCheckOut(
+            pegawaiId,
+            method: 'Sensor NFC',
+            reason: reason,
+            nfcUid: nfcUid,
+            showLoadingDialog: false,
+            showSuccessDialog: false,
+          );
+          return null; // Berhasil
+        } on AttendanceAuthenticationException {
+          return 'Sesi login berakhir. Logout lalu login kembali.';
+        } catch (e) {
+          return 'Gagal melakukan check out: $e';
+        }
+      },
+      onSuccess: (_) {
+        // Data sudah tersinkronisasi saat submit
       },
     );
   }
@@ -730,20 +747,23 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
     required String method,
     String? reason,
     String? nfcUid,
+    bool showLoadingDialog = true,
+    bool showSuccessDialog = true,
   }) async {
     BuildContext? dialogContext;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        dialogContext = ctx;
-        return Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        );
-      },
-    );
-
-    await Future.delayed(const Duration(milliseconds: 100));
+    if (showLoadingDialog) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          dialogContext = ctx;
+          return Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          );
+        },
+      );
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
 
     try {
       final note = reason != null
@@ -762,7 +782,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
 
       await _loadTodayData(isSilent: true);
 
-      if (mounted) {
+      if (mounted && showSuccessDialog) {
         showDialog(
           context: context,
           builder: (context) => SuccessDialog(
@@ -841,57 +861,33 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
     NfcTapDialog.show(
       context,
       isCheckOut: false,
-      onSuccess: (nfcUid) async {
-        final isValid = await _validateNfc(pegawaiId, nfcUid);
-        if (!isValid) return;
-        await _performWfoCheckIn(
-          pegawaiId,
-          method: 'Sensor NFC',
-          nfcUid: nfcUid,
-        );
+      onValidateAndSubmit: (nfcUid) async {
+        try {
+          final isValid = await _attendanceService.validateNfcForPegawai(
+            pegawaiId: pegawaiId,
+            uid: nfcUid,
+          );
+          if (!isValid) {
+            return 'Kartu NFC tidak terdaftar untuk akun Anda. Silakan gunakan kartu terdaftar.';
+          }
+          await _performWfoCheckIn(
+            pegawaiId,
+            method: 'Sensor NFC',
+            nfcUid: nfcUid,
+            showLoadingDialog: false,
+            showSuccessDialog: false,
+          );
+          return null; // Berhasil
+        } on AttendanceAuthenticationException {
+          return 'Sesi login berakhir. Logout lalu login kembali.';
+        } catch (e) {
+          return 'Gagal melakukan check in: $e';
+        }
+      },
+      onSuccess: (_) {
+        // Data sudah tersinkronisasi saat submit
       },
     );
-  }
-
-  Future<bool> _validateNfc(String pegawaiId, String nfcUid) async {
-    try {
-      final isValid = await _attendanceService.validateNfcForPegawai(
-        pegawaiId: pegawaiId,
-        uid: nfcUid,
-      );
-      if (!isValid && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Kartu NFC tidak terdaftar untuk akun Anda.'),
-            backgroundColor: AppColors.danger,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-      return isValid;
-    } on AttendanceAuthenticationException {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sesi login berakhir. Logout lalu login kembali.'),
-            backgroundColor: AppColors.danger,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-      return false;
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Validasi kartu NFC ke server gagal. Coba lagi.'),
-            backgroundColor: AppColors.danger,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-      return false;
-    }
   }
 
   /// Menjalankan verifikasi WiFi untuk Check In WFO.
@@ -1006,20 +1002,23 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
     String pegawaiId, {
     required String method,
     String? nfcUid,
+    bool showLoadingDialog = true,
+    bool showSuccessDialog = true,
   }) async {
     BuildContext? dialogContext;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        dialogContext = ctx;
-        return Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        );
-      },
-    );
-
-    await Future.delayed(const Duration(milliseconds: 100));
+    if (showLoadingDialog) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          dialogContext = ctx;
+          return Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          );
+        },
+      );
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
 
     try {
       await _attendanceService.checkIn(
@@ -1046,15 +1045,17 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
           attendanceMethod = method;
         });
 
-        // Tampilkan SuccessDialog segera sehingga user mendapatkan feedback cepat.
-        showDialog(
-          context: context,
-          builder: (context) => SuccessDialog(
-            title: 'Check In Berhasil!',
-            description: 'Anda berhasil melakukan check in via $method.',
-            onClose: () => Navigator.pop(context),
-          ),
-        );
+        // Tampilkan SuccessDialog jika diminta (misal dari WiFi checkin)
+        if (showSuccessDialog) {
+          showDialog(
+            context: context,
+            builder: (context) => SuccessDialog(
+              title: 'Check In Berhasil!',
+              description: 'Anda berhasil melakukan check in via $method.',
+              onClose: () => Navigator.pop(context),
+            ),
+          );
+        }
       }
 
       // Lakukan sinkronisasi / polling di background untuk memastikan data server tercermin
