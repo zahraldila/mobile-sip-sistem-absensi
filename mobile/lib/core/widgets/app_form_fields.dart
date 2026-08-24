@@ -169,12 +169,14 @@ class AppUploadField extends StatelessWidget {
     this.fileName,
     this.hint,
     required this.onTap,
+    this.onRemove,
   });
 
   final String? label;
   final String? fileName;
   final String? hint;
   final VoidCallback onTap;
+  final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -205,7 +207,13 @@ class AppUploadField extends StatelessWidget {
                     style: AppTypography.textTheme.bodyMedium?.copyWith(color: fileName == null ? AppColors.textDisabled : AppColors.textPrimary),
                   ),
                 ),
-                const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
+                if (fileName != null && onRemove != null)
+                  GestureDetector(
+                    onTap: onRemove,
+                    child: const Icon(Icons.close, size: 18, color: AppColors.textSecondary),
+                  )
+                else
+                  const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textSecondary),
               ],
             ),
           ),
@@ -218,6 +226,7 @@ class AppUploadField extends StatelessWidget {
       ],
     );
   }
+
 }
 
 class AppMultilineField extends StatelessWidget {
