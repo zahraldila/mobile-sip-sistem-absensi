@@ -36,9 +36,125 @@ class _CheckInWfcPageState extends State<CheckInWfcPage> {
       _locationStatus == _DetectionStatus.success &&
       _selfieStatus == _DetectionStatus.success;
 
+  Future<bool> _showEnableGpsDialog() async {
+    if (!mounted) return false;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3F2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.location_off_rounded, color: AppColors.danger, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Layanan Lokasi Nonaktif',
+                style: AppTypography.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Untuk melakukan check in WFC, aktifkan layanan lokasi (GPS) pada perangkat Anda agar sistem dapat memverifikasi titik koordinat.',
+          style: AppTypography.textTheme.bodyMedium?.copyWith(
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Batal', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context, true);
+              await Geolocator.openLocationSettings();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            child: const Text('Aktifkan Lokasi'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Future<bool> _showPermissionDeniedForeverDialog() async {
+    if (!mounted) return false;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.security_rounded, color: AppColors.primary, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Izin Lokasi Dibutuhkan',
+                style: AppTypography.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Aplikasi membutuhkan izin akses lokasi untuk mencatat presensi WFC. Silakan aktifkan izin lokasi di Pengaturan Aplikasi.',
+          style: AppTypography.textTheme.bodyMedium?.copyWith(
+            color: AppColors.textSecondary,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Batal', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context, true);
+              await Geolocator.openAppSettings();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            child: const Text('Buka Pengaturan'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   Future<bool> _ensureLocationPermission() async {
     if (!await Geolocator.isLocationServiceEnabled()) {
-      _showSnackbar('Aktifkan layanan lokasi terlebih dahulu', isError: true);
+      await _showEnableGpsDialog();
       return false;
     }
 
@@ -53,7 +169,7 @@ class _CheckInWfcPageState extends State<CheckInWfcPage> {
     }
 
     if (permission == LocationPermission.deniedForever) {
-      _showSnackbar('Izin lokasi ditolak permanen. Buka pengaturan aplikasi.', isError: true);
+      await _showPermissionDeniedForeverDialog();
       return false;
     }
 
