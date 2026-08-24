@@ -249,10 +249,19 @@ class AuthService {
 
       return authUser;
     } on DioException catch (e) {
-      debugPrint('ERROR');
+      debugPrint('ERROR in AuthService.login: $e');
       debugPrint('${e.response?.statusCode}');
       debugPrint('${e.response?.data}');
-      rethrow;
+      if (e.type == DioExceptionType.connectionError || e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.unknown) {
+        lastErrorMessage = 'Gagal terhubung ke server. Periksa koneksi internet Anda.';
+      } else {
+        lastErrorMessage = 'Terjadi kesalahan pada server. Silakan coba lagi.';
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Unexpected error in AuthService.login: $e');
+      lastErrorMessage = 'Terjadi kesalahan tidak terduga. Silakan coba lagi.';
+      return null;
     }
   }
 

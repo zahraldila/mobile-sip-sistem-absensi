@@ -35,7 +35,10 @@ class _SubmissionPageState extends State<SubmissionPage> {
     final remote = PengajuanRemoteDataSource();
     final repo = PengajuanRepositoryImpl(remote: remote);
     _getPengajuans = GetPengajuans(repo);
+    _loadData();
+  }
 
+  void _loadData() {
     final pegawaiId = AuthState.instance.currentUser?.pegawaiId;
     if (pegawaiId == null || pegawaiId.isEmpty) {
       _future = Future.error('No pegawai id in session');
@@ -101,7 +104,12 @@ class _SubmissionPageState extends State<SubmissionPage> {
                     future: _future,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) return const LoadingWidget();
-                      if (snapshot.hasError) return core_error.ErrorState(title: 'Gagal memuat', message: snapshot.error.toString(), actionLabel: 'Coba Lagi', onAction: () { setState(() { initState(); }); });
+                      if (snapshot.hasError) {
+                        final errStr = snapshot.error.toString();
+                        final isNetworkError = errStr.contains('SocketException') || errStr.contains('connection error');
+                        final msg = isNetworkError ? 'Gagal terhubung ke server. Periksa koneksi internet Anda.' : 'Terjadi kesalahan tidak terduga. Silakan coba lagi.';
+                        return core_error.ErrorState(title: 'Gagal memuat', message: msg, actionLabel: 'Coba Lagi', onAction: () { setState(() { _loadData(); }); });
+                      }
                       final data = snapshot.data ?? [];
                       // ensure allSubmissions is populated on first load
                       if (_allSubmissions.isEmpty) {

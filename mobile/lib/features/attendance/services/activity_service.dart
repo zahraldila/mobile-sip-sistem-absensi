@@ -128,6 +128,50 @@ class ActivityItemData {
       createdAt: createdAt ?? DateTime.now(),
     );
   }
+
+  factory ActivityItemData.login({
+    required String subtitle,
+    required String timeText,
+    String? id,
+    DateTime? createdAt,
+  }) {
+    return ActivityItemData(
+      id: id ?? 'login_${DateTime.now().millisecondsSinceEpoch}',
+      title: 'Login',
+      subtitle: subtitle,
+      timeText: timeText,
+      statusLabel: 'Berhasil',
+      statusColor: const Color(0xFF27AE60),
+      statusBgColor: const Color(0xFFE6F8EE),
+      icon: Icons.login_rounded,
+      iconColor: const Color(0xFF27AE60),
+      iconBgColor: const Color(0xFFE6F8EE),
+      timePillBgColor: const Color(0xFFF1F5F9),
+      createdAt: createdAt ?? DateTime.now(),
+    );
+  }
+
+  factory ActivityItemData.logout({
+    required String subtitle,
+    required String timeText,
+    String? id,
+    DateTime? createdAt,
+  }) {
+    return ActivityItemData(
+      id: id ?? 'logout_${DateTime.now().millisecondsSinceEpoch}',
+      title: 'Logout',
+      subtitle: subtitle,
+      timeText: timeText,
+      statusLabel: 'Berhasil',
+      statusColor: const Color(0xFFF2994A),
+      statusBgColor: const Color(0xFFFDF4E6),
+      icon: Icons.logout_rounded,
+      iconColor: const Color(0xFFF2994A),
+      iconBgColor: const Color(0xFFFDF4E6),
+      timePillBgColor: const Color(0xFFF1F5F9),
+      createdAt: createdAt ?? DateTime.now(),
+    );
+  }
 }
 
 /// Singleton Service pengelola aktivitas real-time
@@ -141,21 +185,29 @@ class ActivityService extends ChangeNotifier {
 
   List<ActivityItemData> get activities => List.unmodifiable(_activities);
 
+  void clear() {
+    _activities.clear();
+    _loadedAkunId = null;
+    notifyListeners();
+  }
+
   /// Memuat aktivitas absensi dan pengajuan nyata dari database
   Future<void> loadActivitiesFromDatabase() async {
-    final currentUser = AuthState.instance.currentUser;
-    final akunId = currentUser?.akunId ?? '';
-    final pegawaiId = currentUser?.pegawaiId ?? '';
-    if (akunId.isEmpty && pegawaiId.isEmpty) {
-      _loadedAkunId = null;
-      _activities.clear();
-      notifyListeners();
-      return;
-    }
+      final currentUser = AuthState.instance.currentUser;
+      final pegawaiId = currentUser?.pegawaiId ?? '';
+      final akunId = currentUser?.akunId ?? '';
 
-    if (_loadedAkunId != akunId) {
-      _activities.clear();
-    }
+      // Muat log lokal (termasuk logout sebelumnya) jika akunId berubah, atau belum pernah dimuat
+      if (_loadedAkunId != akunId) {
+        final restored = await _loadSavedLocalActivities(akunId);
+        // Gabungkan dengan yang sudah ada di _activities (misal log login yang baru saja ditambah)
+        for (final r in restored) {
+          if (!_activities.any((a) => a.id == r.id)) {
+            _activities.add(r);
+          }
+        }
+        _loadedAkunId = akunId;
+      }
 
     try {
       final token = AuthState.instance.currentUser?.accessToken;
@@ -253,6 +305,7 @@ class ActivityService extends ChangeNotifier {
           );
 
           if (auditRes.statusCode == 200 && auditRes.data is List) {
+            debugPrint('[ActivityService] audit_log data: ${auditRes.data}');
             final list = auditRes.data as List;
             for (final item in list) {
               final map = item as Map<String, dynamic>;
@@ -284,7 +337,7 @@ class ActivityService extends ChangeNotifier {
       }
 
       // Restorasi aktivitas lokal sesi hari ini dari SharedPreferences
-      final savedLocals = await _loadSavedLocalActivities();
+      final savedLocals = await _loadSavedLocalActivities(akunId);
       for (final saved in savedLocals) {
         if (!newActivities.any((a) => a.id == saved.id || (a.title == saved.title && a.createdAt.difference(saved.createdAt).abs().inMinutes < 5))) {
           newActivities.add(saved);
@@ -317,17 +370,17 @@ class ActivityService extends ChangeNotifier {
       _activities.clear();
       _activities.addAll(todayActivities);
       _loadedAkunId = akunId;
-      await _saveLocalActivities();
+      await _saveLocalActivities(akunId);
       notifyListeners();
     } catch (e) {
       debugPrint('[ActivityService] Error loading activities from DB: $e');
     }
   }
 
-  void recordAuditActivity(
+  Future<void> recordAuditActivity(
     String aktivitas, {
     DateTime? timestamp,
-  }) {
+  }) async {
     final now = timestamp ?? DateTime.now();
     final item = _activityFromAuditLog(
       id: 'local_${now.millisecondsSinceEpoch}',
@@ -335,14 +388,17 @@ class ActivityService extends ChangeNotifier {
       createdAt: now,
     );
     _activities.insert(0, item);
-    _saveLocalActivities();
+    if (_loadedAkunId != null) {
+      await _saveLocalActivities(_loadedAkunId!);
+    }
     notifyListeners();
   }
 
   static const _localActivitiesKey = 'today_local_activities';
 
-  Future<void> _saveLocalActivities() async {
+  Future<void> _saveLocalActivities(String akunId) async {
     try {
+      if (akunId.isEmpty) return;
       final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now();
       final todayItems = _activities.where((item) {
@@ -359,16 +415,17 @@ class ActivityService extends ChangeNotifier {
         'createdAt': item.createdAt.toIso8601String(),
       }).toList();
 
-      await prefs.setString(_localActivitiesKey, jsonEncode(todayItems));
+      await prefs.setString('${_localActivitiesKey}_$akunId', jsonEncode(todayItems));
     } catch (e) {
       debugPrint('[ActivityService] Error saving local activities: $e');
     }
   }
 
-  Future<List<ActivityItemData>> _loadSavedLocalActivities() async {
+  Future<List<ActivityItemData>> _loadSavedLocalActivities(String akunId) async {
     try {
+      if (akunId.isEmpty) return [];
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_localActivitiesKey);
+      final raw = prefs.getString('${_localActivitiesKey}_$akunId');
       if (raw == null || raw.isEmpty) return [];
 
       final List list = jsonDecode(raw);
@@ -406,23 +463,19 @@ class ActivityService extends ChangeNotifier {
     final timeText = _formatActivityTime(createdAt);
 
     if (normalized.contains('login')) {
-      return ActivityItemData.info(
+      return ActivityItemData.login(
         id: id,
-        title: aktivitas,
         subtitle: 'Log aktivitas akun Anda',
         timeText: timeText,
-        status: 'Berhasil',
         createdAt: createdAt,
       );
     }
 
     if (normalized.contains('logout')) {
-      return ActivityItemData.info(
+      return ActivityItemData.logout(
         id: id,
-        title: aktivitas,
         subtitle: 'Log aktivitas akun Anda',
         timeText: timeText,
-        status: 'Berhasil',
         createdAt: createdAt,
       );
     }
