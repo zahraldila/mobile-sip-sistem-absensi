@@ -18,6 +18,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:sip_sistem_absensi_mobile/core/services/app_settings_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/notification/data/notification_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/notification/services/notification_read_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class AttendanceHomePage extends StatefulWidget {
   const AttendanceHomePage({super.key});
@@ -47,17 +48,42 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
   bool isAlreadyCheckedOut = false;
   bool isLoading = true;
 
+  bool _isConnected = true;
+  late final StreamSubscription<List<ConnectivityResult>> _connectivitySubscription;
+
   @override
   void initState() {
     super.initState();
     _updateTime();
     _timer = Timer.periodic(const Duration(seconds: 30), (_) => _updateTime());
+    _initConnectivity();
     _loadTodayData();
+  }
+
+  Future<void> _initConnectivity() async {
+    final connectivity = Connectivity();
+    try {
+      final results = await connectivity.checkConnectivity();
+      _updateConnectionState(results);
+    } catch (e) {
+      debugPrint('[AttendanceHomePage] Error checking connectivity: $e');
+    }
+
+    _connectivitySubscription = connectivity.onConnectivityChanged.listen(_updateConnectionState);
+  }
+
+  void _updateConnectionState(List<ConnectivityResult> results) {
+    if (!mounted) return;
+    final isOffline = results.isEmpty || (results.length == 1 && results.first == ConnectivityResult.none);
+    setState(() {
+      _isConnected = !isOffline;
+    });
   }
 
   @override
   void dispose() {
     _timer.cancel();
+    _connectivitySubscription.cancel();
     super.dispose();
   }
 
@@ -1058,6 +1084,24 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (!_isConnected)
+                Container(
+                  color: const Color(0xFFFEE2E2),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.wifi_off_rounded, color: Color(0xFFDC2626), size: 20),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Text(
+                          'Tidak ada koneksi internet. Menampilkan data terakhir yang tersimpan.',
+                          style: AppTypography.textTheme.bodySmall?.copyWith(color: const Color(0xFF991B1B)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               if (isLoading) ...[
                 const SizedBox(height: 200),
                 Center(

@@ -23,10 +23,7 @@ class NotificationModel {
       tanggalKirim: json['tanggal_kirim'] != null
           ? (() {
               String dateStr = json['tanggal_kirim'].toString().trim();
-              final hasTimezone = RegExp(r'(Z|[+-]\d{2}:?\d{2})$').hasMatch(dateStr);
-              if (!hasTimezone) {
-                dateStr = '${dateStr.replaceAll(' ', 'T')}Z';
-              }
+              dateStr = dateStr.replaceAll(' ', 'T');
               return DateTime.tryParse(dateStr)?.toLocal() ?? DateTime.now();
             })()
           : DateTime.now(),

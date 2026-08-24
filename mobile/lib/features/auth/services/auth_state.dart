@@ -59,7 +59,7 @@ class AuthState extends ChangeNotifier {
     }
 
     final namaPegawai = user.namaPegawai.isNotEmpty ? user.namaPegawai : user.username;
-    ActivityService.instance.recordAuditActivity('$namaPegawai melakukan Login');
+    await ActivityService.instance.recordAuditActivity('$namaPegawai melakukan Login');
     notifyListeners();
     return true;
   }
@@ -68,9 +68,10 @@ class AuthState extends ChangeNotifier {
     // Catat ke audit_log sebelum _currentUser di-clear
     final aktivitas = await AuditLogService.instance.log('Logout');
     if (aktivitas != null) {
-      ActivityService.instance.recordAuditActivity(aktivitas);
+      await ActivityService.instance.recordAuditActivity(aktivitas);
     }
     _currentUser = null;
+    ActivityService.instance.clear();
     await _sessionService.clearSession();
     notifyListeners();
   }
