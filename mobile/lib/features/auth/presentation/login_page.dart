@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -31,6 +32,21 @@ class _LoginPageState extends State<LoginPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  Future<void> _launchEmail() async {
+    final Uri emailLaunchUri = Uri(
+      scheme: 'mailto',
+      path: 'selada@co.id',
+      query: 'subject=Reset%20Password%20SIP%20Absensi',
+    );
+    if (await canLaunchUrl(emailLaunchUri)) {
+      await launchUrl(emailLaunchUri);
+    } else {
+      if (mounted) {
+        _showSnackbar('Tidak dapat membuka aplikasi email.');
+      }
+    }
   }
 
   Future<void> _handleLogin() async {
@@ -358,11 +374,8 @@ class _LoginPageState extends State<LoginPage> {
                                     ],
                                   ),
                                 ),
-                                GestureDetector(
-                                  onTap: () {
-                                    _showSnackbar(
-                                        'Silakan hubungi IT Support untuk reset kata sandi.');
-                                  },
+                                  GestureDetector(
+                                    onTap: _launchEmail,
                                   child: Text(
                                     'Lupa Kata Sandi?',
                                     style: GoogleFonts.plusJakartaSans(
@@ -410,23 +423,26 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             const SizedBox(height: 18),
                             Center(
-                              child: RichText(
-                                textAlign: TextAlign.center,
-                                text: TextSpan(
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 12.5,
-                                    color: const Color(0xFF64748B),
-                                  ),
-                                  children: [
-                                    const TextSpan(text: 'Butuh bantuan akses? '),
-                                    TextSpan(
-                                      text: 'Hubungi IT Support',
-                                      style: GoogleFonts.plusJakartaSans(
-                                        color: AppColors.primary,
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                              child: GestureDetector(
+                                onTap: _launchEmail,
+                                child: RichText(
+                                  textAlign: TextAlign.center,
+                                  text: TextSpan(
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12.5,
+                                      color: const Color(0xFF64748B),
                                     ),
-                                  ],
+                                    children: [
+                                      const TextSpan(text: 'Butuh bantuan akses? '),
+                                      TextSpan(
+                                        text: 'Hubungi IT Support',
+                                        style: GoogleFonts.plusJakartaSans(
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
