@@ -19,6 +19,7 @@ import 'package:sip_sistem_absensi_mobile/core/services/app_settings_service.dar
 import 'package:sip_sistem_absensi_mobile/features/notification/data/notification_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/notification/services/notification_read_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:sip_sistem_absensi_mobile/core/utils/error_helpers.dart';
 
 class AttendanceHomePage extends StatefulWidget {
   const AttendanceHomePage({super.key});
@@ -812,38 +813,9 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
         Navigator.pop(dialogContext!);
       }
       if (mounted) {
-        final errorStr = e.toString().toLowerCase();
-        if (errorStr.contains('socketexception') || errorStr.contains('failed host lookup') || errorStr.contains('connection error')) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: AppRadius.large),
-              title: Text(
-                'Tidak Ada Koneksi',
-                style: AppTypography.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              content: Text(
-                'Sambungkan ke internet untuk melakukan Check Out.',
-                style: AppTypography.textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Tutup'),
-                ),
-              ],
-            ),
-          );
-          return;
-        }
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Gagal mencatat Check Out: $e'),
+            content: Text(ErrorHelpers.formatUserFriendlyMessage(e, isCheckOut: true)),
             backgroundColor: AppColors.danger,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1102,7 +1074,7 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Gagal mencatat Check In: $e'),
+            content: Text(ErrorHelpers.formatUserFriendlyMessage(e, isCheckOut: false)),
             backgroundColor: AppColors.danger,
             behavior: SnackBarBehavior.floating,
           ),

@@ -6,6 +6,7 @@ import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_radius.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
+import 'package:sip_sistem_absensi_mobile/core/utils/error_helpers.dart';
 import 'package:sip_sistem_absensi_mobile/features/attendance/services/attendance_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 // Perbaikan path import, asumsikan service ada di folder sejajar atau parent
@@ -99,31 +100,26 @@ class _CheckInWfoPageState extends State<CheckInWfoPage>
       }
 
       // 2. Mulai proses scanning
-      String? uid = await _nfcService.scanCard();
+      final uid = await _nfcService.scanCard();
 
-      // 3. Update status berdasarkan hasil scan
-      if (uid != null) {
-        final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
-        final isValid = pegawaiId.isNotEmpty &&
-            await AttendanceService().validateNfcForPegawai(
-              pegawaiId: pegawaiId,
-              uid: uid,
-            );
-        if (!isValid) {
-          setState(() => _nfcStatus = _DetectionStatus.error);
-          _showSnackbar('Kartu NFC tidak terdaftar untuk akun Anda.', isError: true);
-          return;
-        }
-        if (!mounted) return;
-        setState(() {
-          _nfcUid = uid; // Simpan UID
-          _nfcStatus = _DetectionStatus.success;
-        });
-        _showSnackbar('Kartu terdeteksi!');
-      } else {
+      // 3. Validasi ke server
+      final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
+      final isValid = pegawaiId.isNotEmpty &&
+          await AttendanceService().validateNfcForPegawai(
+            pegawaiId: pegawaiId,
+            uid: uid,
+          );
+      if (!isValid) {
         setState(() => _nfcStatus = _DetectionStatus.error);
-        _showSnackbar('Gagal membaca kartu, silakan coba lagi', isError: true);
+        _showSnackbar('Kartu NFC tidak terdaftar untuk akun Anda.', isError: true);
+        return;
       }
+      if (!mounted) return;
+      setState(() {
+        _nfcUid = uid; // Simpan UID
+        _nfcStatus = _DetectionStatus.success;
+      });
+      _showSnackbar('Kartu terdeteksi!');
     } on AttendanceAuthenticationException {
       setState(() => _nfcStatus = _DetectionStatus.error);
       _showSnackbar('Sesi login berakhir. Logout lalu login kembali.', isError: true);
@@ -152,7 +148,7 @@ class _CheckInWfoPageState extends State<CheckInWfoPage>
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
-      _showSnackbar('Gagal melakukan Check In: $error', isError: true);
+      _showSnackbar(ErrorHelpers.formatUserFriendlyMessage(error), isError: true);
     }
   }
 

@@ -7,7 +7,7 @@ import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_radius.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
-
+import 'package:sip_sistem_absensi_mobile/core/utils/error_helpers.dart';
 import 'package:sip_sistem_absensi_mobile/features/attendance/services/attendance_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 
@@ -135,7 +135,7 @@ class _CheckOutPageState extends State<CheckOutPage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Gagal melakukan Check Out: $e'),
+          content: Text(ErrorHelpers.formatUserFriendlyMessage(e, isCheckOut: true)),
           backgroundColor: AppColors.danger,
           behavior: SnackBarBehavior.floating,
         ),

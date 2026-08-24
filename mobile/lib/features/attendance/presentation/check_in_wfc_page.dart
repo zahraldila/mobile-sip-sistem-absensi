@@ -8,7 +8,7 @@ import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_radius.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_typography.dart';
-
+import 'package:sip_sistem_absensi_mobile/core/utils/error_helpers.dart';
 import 'package:sip_sistem_absensi_mobile/features/attendance/services/attendance_service.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 import 'package:sip_sistem_absensi_mobile/features/profile/data/datasources/profile_remote_datasource.dart';
@@ -270,7 +270,7 @@ class _CheckInWfcPageState extends State<CheckInWfcPage> {
         Navigator.of(context).pop(true);
       }
     } catch (e) {
-      _showSnackbar('Gagal melakukan Check In: $e', isError: true);
+      _showSnackbar(ErrorHelpers.formatUserFriendlyMessage(e), isError: true);
     }
   }
 
