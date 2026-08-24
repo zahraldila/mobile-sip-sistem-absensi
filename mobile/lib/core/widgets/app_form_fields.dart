@@ -131,34 +131,42 @@ class AppDateField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: AppRadius.medium,
-            child: InputDecorator(
-              isEmpty: value == null || value!.isEmpty,
-              decoration: InputDecoration(
-                labelText: label,
-                hintText: hint,
-                filled: true,
-                fillColor: AppColors.surface,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                border: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: const BorderSide(color: AppColors.border)),
-                focusedBorder: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: BorderSide(color: AppColors.primary, width: 1.5)),
-                enabledBorder: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: const BorderSide(color: AppColors.border)),
-              ),
-              child: Text(
-                value ?? '',
-                style: AppTypography.textTheme.bodyLarge,
+    return FormField<String>(
+      initialValue: value,
+      validator: validator,
+      builder: (fieldState) {
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: AppRadius.medium,
+                child: InputDecorator(
+                  isEmpty: value == null || value!.isEmpty,
+                  decoration: InputDecoration(
+                    labelText: label,
+                    hintText: hint,
+                    filled: true,
+                    fillColor: AppColors.surface,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                    border: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: const BorderSide(color: AppColors.border)),
+                    focusedBorder: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: BorderSide(color: AppColors.primary, width: 1.5)),
+                    enabledBorder: OutlineInputBorder(borderRadius: AppRadius.medium, borderSide: const BorderSide(color: AppColors.border)),
+                    errorText: fieldState.errorText,
+                  ),
+                  child: Text(
+                    value ?? '',
+                    style: AppTypography.textTheme.bodyLarge,
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        action,
-      ],
+            const SizedBox(width: 12),
+            action,
+          ],
+        );
+      },
     );
   }
 }

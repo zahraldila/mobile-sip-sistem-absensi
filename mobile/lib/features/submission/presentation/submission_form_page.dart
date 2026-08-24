@@ -136,10 +136,6 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
   Future<void> _submit() async {
     if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
-    if (_tanggalList.any((d) => d == null)) {
-      _showError('Tanggal wajib diisi sebelum mengirim pengajuan.');
-      return;
-    }
     final user = AuthState.instance.currentUser;
     if (user == null) {
       _showError('Session tidak ditemukan. Silakan login ulang.');
