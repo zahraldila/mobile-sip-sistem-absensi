@@ -195,9 +195,19 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
 
   String _extractErrorMessage(Object error) {
     if (error is DioException) {
-      return error.response?.data?.toString() ?? error.message ?? 'Unknown error';
+      if (error.type == DioExceptionType.connectionError ||
+          error.type == DioExceptionType.connectionTimeout ||
+          (error.type == DioExceptionType.unknown &&
+              error.error.toString().contains('SocketException'))) {
+        return 'Periksa koneksi internet Anda dan coba kembali.';
+      }
+      return error.response?.data?.toString() ?? error.message ?? 'Terjadi kesalahan tidak terduga. Silakan coba lagi.';
     }
-    return error.toString();
+    final errStr = error.toString();
+    if (errStr.contains('SocketException') || errStr.contains('connection error')) {
+      return 'Periksa koneksi internet Anda dan coba kembali.';
+    }
+    return 'Terjadi kesalahan tidak terduga. Silakan coba lagi.';
   }
 
   void _showError(String message) {
