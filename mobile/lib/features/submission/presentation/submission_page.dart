@@ -135,14 +135,18 @@ class _SubmissionPageState extends State<SubmissionPage> {
                             ),
                             const SizedBox(height: AppSpacing.lg),
                             if (_allSubmissions.isEmpty) ...[
-                              const SizedBox(height: 36),
-                              core_empty.EmptyState(
-                                title: 'Belum ada pengajuan',
-                                message: 'Riwayat pengajuan izin, sakit, atau WFH Anda akan muncul di sini.',
-                                icon: Icon(
-                                  Icons.assignment_outlined,
-                                  size: 48,
-                                  color: AppColors.primary,
+                              SizedBox(
+                                height: MediaQuery.of(context).size.height * 0.45,
+                                child: Center(
+                                  child: core_empty.EmptyState(
+                                    title: 'Belum ada pengajuan',
+                                    message: 'Riwayat pengajuan izin, sakit, atau WFH Anda akan muncul di sini.',
+                                    icon: Icon(
+                                      Icons.assignment_outlined,
+                                      size: 48,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ] else ...[
