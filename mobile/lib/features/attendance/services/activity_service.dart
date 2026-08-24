@@ -336,14 +336,6 @@ class ActivityService extends ChangeNotifier {
         }
       }
 
-      // Restorasi aktivitas lokal sesi hari ini dari SharedPreferences
-      final savedLocals = await _loadSavedLocalActivities(akunId);
-      for (final saved in savedLocals) {
-        if (!newActivities.any((a) => a.id == saved.id || (a.title == saved.title && a.createdAt.difference(saved.createdAt).abs().inMinutes < 5))) {
-          newActivities.add(saved);
-        }
-      }
-
       // Sertakan juga aktivitas lokal yang sedang aktif di memori
       final now = DateTime.now();
       for (final existing in _activities) {
@@ -351,9 +343,17 @@ class ActivityService extends ChangeNotifier {
             existing.createdAt.year == now.year &&
             existing.createdAt.month == now.month &&
             existing.createdAt.day == now.day) {
-          if (!newActivities.any((a) => a.id == existing.id || (a.title == existing.title && a.createdAt.difference(existing.createdAt).abs().inMinutes < 5))) {
+          if (!newActivities.any((a) => a.id == existing.id || (a.title == existing.title && a.createdAt.difference(existing.createdAt).abs().inMinutes < 1))) {
             newActivities.add(existing);
           }
+        }
+      }
+
+      // Restorasi aktivitas lokal sesi hari ini dari SharedPreferences
+      final savedLocals = await _loadSavedLocalActivities(akunId);
+      for (final saved in savedLocals) {
+        if (!newActivities.any((a) => a.id == saved.id || (a.title == saved.title && a.createdAt.difference(saved.createdAt).abs().inMinutes < 1))) {
+          newActivities.add(saved);
         }
       }
 
@@ -435,16 +435,31 @@ class ActivityService extends ChangeNotifier {
       for (final map in list) {
         final dt = DateTime.tryParse(map['createdAt']?.toString() ?? '')?.toLocal();
         if (dt != null && dt.year == now.year && dt.month == now.month && dt.day == now.day) {
-          restored.add(
-            ActivityItemData.info(
-              id: map['id']?.toString() ?? 'local_${dt.millisecondsSinceEpoch}',
-              title: map['title']?.toString() ?? 'Profil Diperbarui',
-              subtitle: map['subtitle']?.toString() ?? 'Informasi kontak berhasil diperbarui',
-              timeText: map['timeText']?.toString() ?? _formatActivityTime(dt),
-              status: map['statusLabel']?.toString() ?? 'Diperbarui',
-              createdAt: dt,
-            ),
-          );
+          final id = map['id']?.toString() ?? 'local_${dt.millisecondsSinceEpoch}';
+          final title = map['title']?.toString() ?? 'Profil Diperbarui';
+          final subtitle = map['subtitle']?.toString() ?? 'Informasi kontak berhasil diperbarui';
+          final timeText = map['timeText']?.toString() ?? _formatActivityTime(dt);
+
+          if (title.toLowerCase().contains('login')) {
+            restored.add(ActivityItemData.login(id: id, subtitle: subtitle, timeText: timeText, createdAt: dt));
+          } else if (title.toLowerCase().contains('logout')) {
+            restored.add(ActivityItemData.logout(id: id, subtitle: subtitle, timeText: timeText, createdAt: dt));
+          } else if (title.toLowerCase().contains('check in')) {
+            restored.add(ActivityItemData.checkIn(id: id, subtitle: subtitle, timeText: timeText, createdAt: dt));
+          } else if (title.toLowerCase().contains('check out')) {
+            restored.add(ActivityItemData.checkOut(id: id, subtitle: subtitle, timeText: timeText, createdAt: dt));
+          } else {
+            restored.add(
+              ActivityItemData.info(
+                id: id,
+                title: title,
+                subtitle: subtitle,
+                timeText: timeText,
+                status: map['statusLabel']?.toString() ?? 'Diperbarui',
+                createdAt: dt,
+              ),
+            );
+          }
         }
       }
       return restored;
