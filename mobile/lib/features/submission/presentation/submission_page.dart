@@ -67,6 +67,19 @@ class _SubmissionPageState extends State<SubmissionPage> {
   }
 
 
+  Color get _emptyStateColor {
+    switch (_filter) {
+      case 'Pending':
+        return AppColors.warning;
+      case 'Disetujui':
+        return AppColors.success;
+      case 'Ditolak':
+        return AppColors.danger;
+      default:
+        return AppColors.primary;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -142,7 +155,7 @@ class _SubmissionPageState extends State<SubmissionPage> {
                               child: _FilterRow(filter: _filter, onFilter: _applyFilter),
                             ),
                             const SizedBox(height: AppSpacing.lg),
-                            if (_allSubmissions.isEmpty) ...[
+                            if (_items.isEmpty) ...[
                               SizedBox(
                                 height: MediaQuery.of(context).size.height * 0.45,
                                 child: Center(
@@ -152,7 +165,7 @@ class _SubmissionPageState extends State<SubmissionPage> {
                                     icon: Icon(
                                       Icons.assignment_outlined,
                                       size: 48,
-                                      color: AppColors.primary,
+                                      color: _emptyStateColor,
                                     ),
                                   ),
                                 ),
