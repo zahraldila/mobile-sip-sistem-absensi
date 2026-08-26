@@ -60,14 +60,16 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
-  Future<void> _fetchProfileData() async {
+  Future<void> _fetchProfileData({bool isSilent = false}) async {
     debugPrint("===== FETCH PROFILE =====");
 
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (!isSilent) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final currentUser = AuthState.instance.currentUser;
@@ -597,26 +599,38 @@ Positioned(
                                   return;
                                 }
 
+                                setState(() {
+                                  _email = nextEmail;
+                                  _phone = nextPhone;
+                                  if (_pegawaiData != null) {
+                                    _pegawaiData!['email'] = nextEmail;
+                                    _pegawaiData!['no_handphone'] = nextPhone;
+                                  }
+                                });
+
                                 await AuthState.instance.updateCurrentUserEmail(
                                   nextEmail,
                                 );
-                                await _fetchProfileData();
 
-                                if (!context.mounted) return;
-                                await showModalBottomSheet(
-                                  context: context,
-                                  useRootNavigator: true,
-                                  backgroundColor: Colors.transparent,
-                                  shape: const RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-                                  ),
-                                  clipBehavior: Clip.antiAlias,
-                                  builder: (context) => const SuccessSheet(
-                                    title: 'Berhasil!',
-                                    message:
-                                        'Informasi kontak berhasil diperbarui.',
-                                  ),
-                                );
+                                if (context.mounted) {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    useRootNavigator: true,
+                                    backgroundColor: Colors.transparent,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                                    ),
+                                    clipBehavior: Clip.antiAlias,
+                                    builder: (context) => const SuccessSheet(
+                                      title: 'Berhasil!',
+                                      message:
+                                          'Informasi kontak berhasil diperbarui.',
+                                    ),
+                                  );
+                                }
+
+                                // Sinkronisasi latar belakang tanpa memicu loading screen putih
+                                _fetchProfileData(isSilent: true);
                               }
                             },
                             child: Container(
