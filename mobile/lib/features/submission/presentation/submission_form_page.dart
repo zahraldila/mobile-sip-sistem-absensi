@@ -150,25 +150,20 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
 
     try {
       if (_selectedFile != null) {
-        try {
-          // Prepare file object
-          File fileToUpload;
-          if (_selectedFile!.path.isNotEmpty) {
-            fileToUpload = File(_selectedFile!.path);
-          } else {
-            // Write bytes to temp file
-            final bytes = await _selectedFile!.readAsBytes();
-            final tmp = File('${Directory.systemTemp.path}/${DateTime.now().millisecondsSinceEpoch}_${_selectedFile!.name}');
-            await tmp.writeAsBytes(bytes);
-            fileToUpload = tmp;
-          }
-
-          final remote = PengajuanRemoteDataSource();
-          uploadedPath = await remote.uploadLampiran(pegawaiId: user.pegawaiId, file: fileToUpload);
-        } catch (e) {
-          _showError('Gagal mengunggah lampiran. ${e.toString()}');
-          return;
+        // Prepare file object
+        File fileToUpload;
+        if (_selectedFile!.path.isNotEmpty) {
+          fileToUpload = File(_selectedFile!.path);
+        } else {
+          // Write bytes to temp file
+          final bytes = await _selectedFile!.readAsBytes();
+          final tmp = File('${Directory.systemTemp.path}/${DateTime.now().millisecondsSinceEpoch}_${_selectedFile!.name}');
+          await tmp.writeAsBytes(bytes);
+          fileToUpload = tmp;
         }
+
+        final remote = PengajuanRemoteDataSource();
+        uploadedPath = await remote.uploadLampiran(pegawaiId: user.pegawaiId, file: fileToUpload);
       }
 
       final request = PengajuanRequest(
