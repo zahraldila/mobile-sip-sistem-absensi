@@ -50,8 +50,8 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _launchEmail() async {
     final Uri emailLaunchUri = Uri(
       scheme: 'mailto',
-      path: 'selada@co.id',
-      query: 'subject=Reset%20Password%20SIP%20Absensi',
+      path: 'seladaidproduktif@gmail.com',
+      query: 'subject=Sistem%20Absensi%20SIP%20',
     );
     if (await canLaunchUrl(emailLaunchUri)) {
       await launchUrl(emailLaunchUri);
