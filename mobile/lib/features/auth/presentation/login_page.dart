@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
+import 'package:sip_sistem_absensi_mobile/core/widgets/warning_dialog.dart';
 import 'package:sip_sistem_absensi_mobile/features/auth/services/auth_state.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -31,6 +32,18 @@ class _LoginPageState extends State<LoginPage> {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
+    );
+  }
+
+  void _showInactiveAccountDialog(String message) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => WarningDialog(
+        title: 'Akun Tidak Aktif',
+        description: message,
+        buttonLabel: 'Tutup',
+        onAcknowledge: () => Navigator.of(context).pop(),
+      ),
     );
   }
 
@@ -71,7 +84,12 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     if (!success) {
-      _showSnackbar(AuthState.instance.lastErrorMessage ?? 'Username atau password salah.');
+      final errorMessage = AuthState.instance.lastErrorMessage ?? 'Username atau password salah.';
+      if (errorMessage.toLowerCase().contains('tidak aktif')) {
+        _showInactiveAccountDialog(errorMessage);
+      } else {
+        _showSnackbar(errorMessage);
+      }
       return;
     }
 
