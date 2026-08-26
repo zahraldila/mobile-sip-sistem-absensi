@@ -195,6 +195,14 @@ class AuthService {
         pegawaiData = await getPegawaiDetail(pegawaiId);
       }
 
+      // Cek status pegawai — hanya tolak jika eksplisit 'Tidak Aktif'.
+      // Status 'Aktif' dan NULL tetap dapat login seperti sebelumnya.
+      final pegawaiStatus = pegawaiData?['status']?.toString() ?? '';
+      if (pegawaiStatus == 'Tidak Aktif') {
+        lastErrorMessage = 'Akun Anda tidak aktif. Silakan hubungi Admin.';
+        return null;
+      }
+
       final emailForSupabase = _resolveSupabaseAuthEmail(
         normalizedIdentifier: normalizedIdentifier,
         rawAccount: rawAccount,
