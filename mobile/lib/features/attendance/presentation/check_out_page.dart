@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_colors.dart';
@@ -90,12 +91,41 @@ class _CheckOutPageState extends State<CheckOutPage> {
   Future<void> _submitCheckOut() async {
     final pegawaiId = AuthState.instance.currentUser?.pegawaiId ?? '';
     setState(() => _isSubmitting = true);
+
+    // Ambil koordinat GPS perangkat secara best-effort (tidak memblokir jika gagal)
+    double? latitude;
+    double? longitude;
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (serviceEnabled) {
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          permission = await Geolocator.requestPermission();
+        }
+        if (permission != LocationPermission.denied &&
+            permission != LocationPermission.deniedForever) {
+          final position = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              timeLimit: Duration(seconds: 10),
+            ),
+          );
+          latitude = position.latitude;
+          longitude = position.longitude;
+        }
+      }
+    } catch (e) {
+      debugPrint('[CheckOutPage] GPS capture failed (best-effort): $e');
+    }
+
     try {
       await AttendanceService().checkOut(
         pegawaiId: pegawaiId,
         catatan: _notesController.text.trim().isNotEmpty
             ? _notesController.text.trim()
             : 'Check-out',
+        latitude: latitude,
+        longitude: longitude,
       );
       if (!mounted) return;
       setState(() => _isSubmitting = false);

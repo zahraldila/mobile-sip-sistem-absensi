@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:sip_sistem_absensi_mobile/core/theme/app_spacing.dart';
@@ -766,6 +767,9 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       await Future.delayed(const Duration(milliseconds: 100));
     }
 
+    // Ambil koordinat GPS perangkat secara best-effort (tidak memblokir jika gagal)
+    final gps = await _getGpsCoordinates();
+
     try {
       final note = reason != null
           ? 'Check-out via $method (Alasan: $reason)'
@@ -775,6 +779,8 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       await _attendanceService.checkOut(
         pegawaiId: pegawaiId,
         catatan: noteWithNfc,
+        latitude: gps.latitude,
+        longitude: gps.longitude,
       );
 
       if (dialogContext != null && dialogContext!.mounted) {
@@ -969,6 +975,35 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
     }
   }
 
+  /// Mengambil koordinat GPS perangkat secara best-effort.
+  /// Jika GPS tidak tersedia atau gagal, mengembalikan null tanpa melempar exception.
+  Future<({double? latitude, double? longitude})> _getGpsCoordinates() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return (latitude: null, longitude: null);
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return (latitude: null, longitude: null);
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+      return (latitude: position.latitude, longitude: position.longitude);
+    } catch (e) {
+      debugPrint('[AttendanceHomePage] GPS capture failed (best-effort): $e');
+      return (latitude: null, longitude: null);
+    }
+  }
+
   /// Eksekusi pengiriman data check-in WFO ke database dan tampilkan SuccessDialog.
   Future<void> _performWfoCheckIn(
     String pegawaiId, {
@@ -992,12 +1027,17 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
       await Future.delayed(const Duration(milliseconds: 100));
     }
 
+    // Ambil koordinat GPS perangkat secara best-effort (tidak memblokir jika gagal)
+    final gps = await _getGpsCoordinates();
+
     try {
       await _attendanceService.checkIn(
         pegawaiId: pegawaiId,
         skemaKerja: 'WFO',
         jadwalId: todayJadwalId,
         statusKehadiran: 'Hadir',
+        latitude: gps.latitude,
+        longitude: gps.longitude,
         catatan: nfcUid == null
             ? 'Check-in via $method'
             : 'Check-in via $method [UID NFC: $nfcUid]',
@@ -2194,8 +2234,8 @@ class CheckInMethodSelectionSheet extends StatelessWidget {
             icon: Icons.wifi_rounded,
             iconColor: const Color(0xFF059669), // Green
             bgColor: const Color(0xFFECFDF5),
-            title: 'WiFi Kantor',
-            description: 'Verifikasi kehadiran otomatis dengan tersambung ke WiFi kantor.',
+            title: 'WiFi & Deteksi Lokasi',
+            description: 'Verifikasi WiFi dan deteksi lokasi perangkat.',
             onTap: onWiFiSelected,
           ),
           const SizedBox(height: 20),
@@ -2339,8 +2379,8 @@ class CheckOutMethodSelectionSheet extends StatelessWidget {
             icon: Icons.wifi_rounded,
             iconColor: const Color(0xFF059669), // Green
             bgColor: const Color(0xFFECFDF5),
-            title: 'WiFi Kantor',
-            description: 'Verifikasi kepulangan otomatis dengan tersambung ke WiFi kantor.',
+            title: 'WiFi & Deteksi Lokasi',
+            description: 'Verifikasi WiFi dan deteksi lokasi perangkat.',
             onTap: onWiFiSelected,
           ),
           const SizedBox(height: 20),

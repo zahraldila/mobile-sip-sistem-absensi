@@ -317,6 +317,8 @@ class AttendanceService {
   Future<void> checkOut({
     required String pegawaiId,
     String? catatan,
+    double? latitude,
+    double? longitude,
   }) async {
     try {
       final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -325,6 +327,8 @@ class AttendanceService {
       final data = {
         'jam_checkout': nowIso,
         'catatan': catatan,
+        if (latitude != null) 'latitude_checkout': latitude,
+        if (longitude != null) 'longitude_checkout': longitude,
       };
 
       final options = await _buildOptions();
