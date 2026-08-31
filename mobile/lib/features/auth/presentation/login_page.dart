@@ -87,6 +87,17 @@ class _LoginPageState extends State<LoginPage> {
       final errorMessage = AuthState.instance.lastErrorMessage ?? 'Username atau password salah.';
       if (errorMessage.toLowerCase().contains('tidak aktif')) {
         _showInactiveAccountDialog(errorMessage);
+      } else if (errorMessage.toLowerCase().contains('akses mobile')) {
+        showDialog<void>(
+          context: context,
+          builder: (context) => WarningDialog(
+            title: 'Akun Tidak Memiliki Akses',
+            description:
+                'Akun ini tidak dapat digunakan di aplikasi mobile. Silakan gunakan akun pegawai untuk login.',
+            buttonLabel: 'Tutup',
+            onAcknowledge: () => Navigator.of(context).pop(),
+          ),
+        );
       } else {
         _showSnackbar(errorMessage);
       }
