@@ -142,6 +142,12 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
       return;
     }
 
+    final isCleaningService = user.divisi.trim().toLowerCase() == 'cleaning service';
+    if (isCleaningService && (_selectedJenis == 'WFH' || _selectedJenis == 'WFC')) {
+      _showError('Pegawai divisi Cleaning Service tidak diperbolehkan mengajukan WFH/WFC.');
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
     });
@@ -232,6 +238,9 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
 
   @override
   Widget build(BuildContext context) {
+    final user = AuthState.instance.currentUser;
+    final isCleaningService = user?.divisi.trim().toLowerCase() == 'cleaning service';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -252,12 +261,14 @@ class _SubmissionFormPageState extends State<SubmissionFormPage> {
                   label: 'Jenis Pengajuan',
                   hint: 'Pilih Jenis Pengajuan',
                   value: _selectedJenis,
-                  items: const [
-                    DropdownMenuItem(value: 'WFH', child: Text('WFH')),
-                    DropdownMenuItem(value: 'WFC', child: Text('WFC')),
-                    DropdownMenuItem(value: 'Izin', child: Text('Izin')),
-                    DropdownMenuItem(value: 'Sakit', child: Text('Sakit')),
-                    DropdownMenuItem(value: 'Koreksi Absensi', child: Text('Koreksi Absensi')),
+                  items: [
+                    if (!isCleaningService)
+                      const DropdownMenuItem(value: 'WFH', child: Text('WFH')),
+                    if (!isCleaningService)
+                      const DropdownMenuItem(value: 'WFC', child: Text('WFC')),
+                    const DropdownMenuItem(value: 'Izin', child: Text('Izin')),
+                    const DropdownMenuItem(value: 'Sakit', child: Text('Sakit')),
+                    const DropdownMenuItem(value: 'Koreksi Absensi', child: Text('Koreksi Absensi')),
                   ],
                   onChanged: (value) {
                     setState(() {
