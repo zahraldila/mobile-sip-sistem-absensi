@@ -394,9 +394,9 @@ class _AttendanceHomePageState extends State<AttendanceHomePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('WiFi Kantor', style: AppTypography.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
+                          Text('WiFi & Deteksi Lokasi', style: AppTypography.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700)),
                           const SizedBox(height: 4),
-                          Text('Verifikasi kehadiran otomatis dengan tersambung ke WiFi kantor.', style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
+                          Text('Verifikasi kehadiran otomatis dengan tersambung ke WiFi kantor dan deteksi lokasi.', style: AppTypography.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
                         ],
                       ),
                     ),
